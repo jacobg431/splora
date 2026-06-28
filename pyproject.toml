@@ -38,7 +38,7 @@ line-length = 100
 select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
-testpaths = ["test"]
+testpaths = ["test/unit", "test/integration"]
 tmp_path_retention_policy = "none"
 
 [tool.mypy]

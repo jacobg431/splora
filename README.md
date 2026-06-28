@@ -84,3 +84,13 @@ pytest test/unit/                      # unit tests only
 pytest test/integration/               # integration tests only
 pytest -k "test_fmt_bytes"             # run tests matching a name pattern
 ```
+
+### End-to-end tests
+
+The E2E suite drives the full pipeline — `explore` → `report` → `boot` — as a single session. It is excluded from the default `pytest` run and must be invoked explicitly:
+
+```
+pytest test/end2end/
+```
+
+The suite invokes `explore` and `report` as real subprocesses, starts the HTTP server in a background thread, runs assertions against all three stages, and deletes the `splora-e2e` run artifacts from `data/` on teardown.
