@@ -1,0 +1,46 @@
+# Splora default exclude list
+# One directory name per line. Lines starting with # are comments.
+# These are matched against the exact name of each directory encountered
+# during traversal, not against full paths. Disable this list entirely
+# with --no-default-excludes, or add extra entries with --exclude <name>.
+
+# Version control
+.git
+.svn
+.hg
+
+# Python
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.tox
+.nox
+venv
+.venv
+env
+.env
+.eggs
+
+# JavaScript / Node
+node_modules
+.next
+.nuxt
+dist
+.cache
+
+# Build output
+build
+target
+out
+bin
+obj
+
+# IDE / editor
+.idea
+.vscode
+
+# OS
+.DS_Store
+$RECYCLE.BIN
+System Volume Information
