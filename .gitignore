@@ -219,3 +219,7 @@ __marimo__/
 
 # Temprory files and folders
 agent/temp/
+
+# Generated files and folders
+data/filesystem/
+data/report/

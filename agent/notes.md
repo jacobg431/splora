@@ -60,9 +60,25 @@ boot:
 - Info panel: size + file count + two pie charts (extension + category) ✓
 - data/ is for local assets generated or used by the tool; vendor/ is top-level ✓
 
+## Implementation Status
+
+- explore.py ✓ — fully implemented and tested (93 unit + integration tests)
+- report.py ✓ — implemented; copies template + vendor + data.json to data/report/<name>/
+- boot.py — stub, next to implement
+
+## Report folder structure
+
+data/report/<safe-name>/
+  index.html       ← copied from data/template/
+  style.css        ← copied from data/template/
+  script.js        ← copied from data/template/
+  data.json        ← the raw JSON from data/filesystem/<name>.json
+  vendor/
+    echarts.min.js ← copied from vendor/
+
 ## Open / Flagged Issues
 
-- One minor unresolved: should pyproject.toml include a [project.scripts] entry point (enabling `splora explore ...` after pip install -e .)? Or just python splora.py usage? Flagged to user.
+- One minor unresolved: should pyproject.toml include a [project.scripts] entry point (enabling `splora explore ...` after pip install -e .)? Or just python splora.py usage? Flagged to user. (Now resolved: pip-installable entry point is implemented.)
 
 ## Proposed File Categories (to be refined by user)
 
