@@ -21,8 +21,8 @@ from src.explore import _FS_DIR
 from src.report import _REPORT_DIR
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-RUN_NAME     = "splora-e2e"
-_PORT_START  = 15000
+RUN_NAME = "splora-e2e"
+_PORT_START = 15000
 
 
 def _build_scan_tree(root: Path) -> None:
@@ -44,8 +44,12 @@ def e2e_pipeline(tmp_path_factory):
     # ── explore ────────────────────────────────────────────────────────────
     subprocess.run(
         [
-            sys.executable, "splora.py", "explore", str(scan_root),
-            "--name", RUN_NAME,
+            sys.executable,
+            "splora.py",
+            "explore",
+            str(scan_root),
+            "--name",
+            RUN_NAME,
             "--no-default-excludes",
         ],
         cwd=PROJECT_ROOT,
@@ -72,12 +76,12 @@ def e2e_pipeline(tmp_path_factory):
     time.sleep(0.3)  # give the server time to bind
 
     yield {
-        "scan_root":  scan_root,
-        "run_name":   RUN_NAME,
-        "json_path":  _FS_DIR / f"{RUN_NAME}.json",
+        "scan_root": scan_root,
+        "run_name": RUN_NAME,
+        "json_path": _FS_DIR / f"{RUN_NAME}.json",
         "report_dir": report_dir,
-        "port":       port,
-        "url":        f"http://localhost:{port}/",
+        "port": port,
+        "url": f"http://localhost:{port}/",
     }
 
     # ── teardown: remove all e2e artifacts from data/ ─────────────────────

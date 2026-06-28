@@ -61,7 +61,7 @@ class TestLatestJson:
         old = tmp_path / "old.json"
         new = tmp_path / "new.json"
         old.write_text("{}", encoding="utf-8")
-        time.sleep(0.02)   # ensure distinct mtime on any filesystem
+        time.sleep(0.02)  # ensure distinct mtime on any filesystem
         new.write_text("{}", encoding="utf-8")
         assert _latest_json(tmp_path) == new
 

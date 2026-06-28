@@ -7,11 +7,11 @@ import shutil
 import sys
 from pathlib import Path
 
-_REPO_ROOT    = Path(__file__).parent.parent
-_FS_DIR       = _REPO_ROOT / "data" / "filesystem"
+_REPO_ROOT = Path(__file__).parent.parent
+_FS_DIR = _REPO_ROOT / "data" / "filesystem"
 _TEMPLATE_DIR = _REPO_ROOT / "data" / "template"
-_REPORT_DIR   = _REPO_ROOT / "data" / "report"
-_VENDOR_DIR   = _REPO_ROOT / "vendor"
+_REPORT_DIR = _REPO_ROOT / "data" / "report"
+_VENDOR_DIR = _REPO_ROOT / "vendor"
 
 _TEMPLATE_FILES = ("index.html", "style.css", "script.js")
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
@@ -53,7 +53,7 @@ def _read_json(path: Path) -> tuple[str, dict]:
     Exits with code 1 on I/O or parse errors.
     """
     try:
-        raw  = path.read_text(encoding="utf-8")
+        raw = path.read_text(encoding="utf-8")
         data = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc:
         print(f"Error: cannot read {path}: {exc}", file=sys.stderr)
@@ -89,7 +89,7 @@ def _build_report(
 def report(args: argparse.Namespace) -> None:
     json_path = _resolve_json_path(args.name, _FS_DIR)
     raw, data = _read_json(json_path)
-    meta      = data.get("meta", {})
+    meta = data.get("meta", {})
 
     missing = _missing_assets(_TEMPLATE_DIR, _VENDOR_DIR)
     if missing:

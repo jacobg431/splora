@@ -80,19 +80,19 @@ class TestFmtBytes:
         assert _fmt_bytes(1536) == "1.5 KB"
 
     def test_exactly_one_mb(self):
-        assert _fmt_bytes(1024 ** 2) == "1.0 MB"
+        assert _fmt_bytes(1024**2) == "1.0 MB"
 
     def test_exactly_one_gb(self):
-        assert _fmt_bytes(1024 ** 3) == "1.0 GB"
+        assert _fmt_bytes(1024**3) == "1.0 GB"
 
     def test_exactly_one_tb(self):
-        assert _fmt_bytes(1024 ** 4) == "1.0 TB"
+        assert _fmt_bytes(1024**4) == "1.0 TB"
 
     def test_exactly_one_pb(self):
-        assert _fmt_bytes(1024 ** 5) == "1.0 PB"
+        assert _fmt_bytes(1024**5) == "1.0 PB"
 
     def test_large_byte_value(self):
-        result = _fmt_bytes(1024 ** 3 * 2.5)
+        result = _fmt_bytes(1024**3 * 2.5)
         assert result == "2.5 GB"
 
 
@@ -100,34 +100,37 @@ class TestFmtBytes:
 
 
 class TestCategories:
-    @pytest.mark.parametrize("ext,expected", [
-        (".jpg",  "Image"),
-        (".jpeg", "Image"),
-        (".png",  "Image"),
-        (".mp4",  "Video"),
-        (".avi",  "Video"),
-        (".mp3",  "Audio"),
-        (".flac", "Audio"),
-        (".pdf",  "Document"),
-        (".docx", "Document"),
-        (".py",   "Source Code"),
-        (".js",   "Source Code"),
-        (".ts",   "Source Code"),
-        (".go",   "Source Code"),
-        (".json", "Data"),
-        (".csv",  "Data"),
-        (".yaml", "Data"),
-        (".zip",  "Archive"),
-        (".tar",  "Archive"),
-        (".7z",   "Archive"),
-        (".exe",  "Executable"),
-        (".dll",  "Executable"),
-        (".so",   "Executable"),
-        (".ttf",  "Font"),
-        (".woff", "Font"),
-        (".ini",  "Config"),
-        (".env",  "Config"),
-    ])
+    @pytest.mark.parametrize(
+        "ext,expected",
+        [
+            (".jpg", "Image"),
+            (".jpeg", "Image"),
+            (".png", "Image"),
+            (".mp4", "Video"),
+            (".avi", "Video"),
+            (".mp3", "Audio"),
+            (".flac", "Audio"),
+            (".pdf", "Document"),
+            (".docx", "Document"),
+            (".py", "Source Code"),
+            (".js", "Source Code"),
+            (".ts", "Source Code"),
+            (".go", "Source Code"),
+            (".json", "Data"),
+            (".csv", "Data"),
+            (".yaml", "Data"),
+            (".zip", "Archive"),
+            (".tar", "Archive"),
+            (".7z", "Archive"),
+            (".exe", "Executable"),
+            (".dll", "Executable"),
+            (".so", "Executable"),
+            (".ttf", "Font"),
+            (".woff", "Font"),
+            (".ini", "Config"),
+            (".env", "Config"),
+        ],
+    )
     def test_known_extension_maps_to_correct_category(self, ext: str, expected: str):
         assert CATEGORIES[ext] == expected
 
@@ -136,8 +139,16 @@ class TestCategories:
 
     def test_all_values_are_valid_categories(self):
         valid = {
-            "Image", "Video", "Audio", "Document", "Source Code",
-            "Data", "Archive", "Executable", "Font", "Config",
+            "Image",
+            "Video",
+            "Audio",
+            "Document",
+            "Source Code",
+            "Data",
+            "Archive",
+            "Executable",
+            "Font",
+            "Config",
         }
         assert set(CATEGORIES.values()) == valid
 
@@ -224,7 +235,9 @@ class TestResolveName:
 
 
 class TestBuildExcludes:
-    def _args(self, exclude: list[str] | None = None, no_default_excludes: bool = False) -> argparse.Namespace:
+    def _args(
+        self, exclude: list[str] | None = None, no_default_excludes: bool = False
+    ) -> argparse.Namespace:
         return argparse.Namespace(exclude=exclude or [], no_default_excludes=no_default_excludes)
 
     def test_user_excludes_are_included(self):
@@ -262,7 +275,9 @@ class TestBuildExcludes:
 
 
 class TestBuildState:
-    def _args(self, max_files: int | None = None, timeout: float | None = None) -> argparse.Namespace:
+    def _args(
+        self, max_files: int | None = None, timeout: float | None = None
+    ) -> argparse.Namespace:
         return argparse.Namespace(max_files=max_files, timeout=timeout)
 
     def test_no_limits_produces_unlimited_state(self):
@@ -305,7 +320,7 @@ class TestScanDir:
         assert node["path"] == str(tmp_path)
 
     def test_counts_files_and_accumulates_size(self, tmp_path: Path):
-        (tmp_path / "a.txt").write_bytes(b"hello")   # 5 bytes
+        (tmp_path / "a.txt").write_bytes(b"hello")  # 5 bytes
         (tmp_path / "b.txt").write_bytes(b"world!")  # 6 bytes
         node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
         assert node["file_count"] == 2
@@ -351,7 +366,9 @@ class TestScanDir:
         ignored = tmp_path / "node_modules"
         ignored.mkdir()
         (ignored / "big.js").write_bytes(b"x" * 1000)
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes={"node_modules"}, state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes={"node_modules"}, state=_State()
+        )
         assert node["file_count"] == 0
         assert node["children"] == []
 

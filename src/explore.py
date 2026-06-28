@@ -14,54 +14,119 @@ from pathlib import Path
 
 CATEGORIES: dict[str, str] = {
     # Image
-    ".jpg": "Image",  ".jpeg": "Image",  ".png":  "Image",  ".gif":  "Image",
-    ".bmp": "Image",  ".svg":  "Image",  ".webp": "Image",  ".ico":  "Image",
-    ".tiff": "Image", ".tif":  "Image",  ".heic": "Image",  ".avif": "Image",
-    ".raw":  "Image",
+    ".jpg": "Image",
+    ".jpeg": "Image",
+    ".png": "Image",
+    ".gif": "Image",
+    ".bmp": "Image",
+    ".svg": "Image",
+    ".webp": "Image",
+    ".ico": "Image",
+    ".tiff": "Image",
+    ".tif": "Image",
+    ".heic": "Image",
+    ".avif": "Image",
+    ".raw": "Image",
     # Video
-    ".mp4": "Video", ".avi":  "Video", ".mkv":  "Video", ".mov": "Video",
-    ".wmv": "Video", ".flv":  "Video", ".webm": "Video", ".m4v": "Video",
+    ".mp4": "Video",
+    ".avi": "Video",
+    ".mkv": "Video",
+    ".mov": "Video",
+    ".wmv": "Video",
+    ".flv": "Video",
+    ".webm": "Video",
+    ".m4v": "Video",
     # Audio
-    ".mp3": "Audio", ".wav":  "Audio", ".flac": "Audio", ".aac": "Audio",
-    ".ogg": "Audio", ".m4a":  "Audio", ".wma":  "Audio",
+    ".mp3": "Audio",
+    ".wav": "Audio",
+    ".flac": "Audio",
+    ".aac": "Audio",
+    ".ogg": "Audio",
+    ".m4a": "Audio",
+    ".wma": "Audio",
     # Document
-    ".pdf":  "Document", ".doc":  "Document", ".docx": "Document",
-    ".xls":  "Document", ".xlsx": "Document", ".ppt":  "Document",
-    ".pptx": "Document", ".odt":  "Document", ".ods":  "Document",
-    ".odp":  "Document",
+    ".pdf": "Document",
+    ".doc": "Document",
+    ".docx": "Document",
+    ".xls": "Document",
+    ".xlsx": "Document",
+    ".ppt": "Document",
+    ".pptx": "Document",
+    ".odt": "Document",
+    ".ods": "Document",
+    ".odp": "Document",
     # Source Code
-    ".py":   "Source Code", ".js":    "Source Code", ".ts":  "Source Code",
-    ".java": "Source Code", ".c":     "Source Code", ".cpp": "Source Code",
-    ".h":    "Source Code", ".hpp":   "Source Code", ".cs":  "Source Code",
-    ".go":   "Source Code", ".rs":    "Source Code", ".rb":  "Source Code",
-    ".php":  "Source Code", ".swift": "Source Code", ".kt":  "Source Code",
-    ".sh":   "Source Code", ".bat":   "Source Code", ".ps1": "Source Code",
-    ".sql":  "Source Code", ".r":     "Source Code", ".lua": "Source Code",
+    ".py": "Source Code",
+    ".js": "Source Code",
+    ".ts": "Source Code",
+    ".java": "Source Code",
+    ".c": "Source Code",
+    ".cpp": "Source Code",
+    ".h": "Source Code",
+    ".hpp": "Source Code",
+    ".cs": "Source Code",
+    ".go": "Source Code",
+    ".rs": "Source Code",
+    ".rb": "Source Code",
+    ".php": "Source Code",
+    ".swift": "Source Code",
+    ".kt": "Source Code",
+    ".sh": "Source Code",
+    ".bat": "Source Code",
+    ".ps1": "Source Code",
+    ".sql": "Source Code",
+    ".r": "Source Code",
+    ".lua": "Source Code",
     # Data
-    ".json": "Data", ".csv":    "Data", ".xml":     "Data",
-    ".yaml": "Data", ".yml":    "Data", ".toml":    "Data",
-    ".db":   "Data", ".sqlite": "Data", ".parquet": "Data",
+    ".json": "Data",
+    ".csv": "Data",
+    ".xml": "Data",
+    ".yaml": "Data",
+    ".yml": "Data",
+    ".toml": "Data",
+    ".db": "Data",
+    ".sqlite": "Data",
+    ".parquet": "Data",
     # Archive
-    ".zip": "Archive", ".tar": "Archive", ".gz":  "Archive",
-    ".bz2": "Archive", ".7z":  "Archive", ".rar": "Archive", ".xz": "Archive",
+    ".zip": "Archive",
+    ".tar": "Archive",
+    ".gz": "Archive",
+    ".bz2": "Archive",
+    ".7z": "Archive",
+    ".rar": "Archive",
+    ".xz": "Archive",
     # Executable
-    ".exe":   "Executable", ".dll": "Executable", ".so":  "Executable",
-    ".dylib": "Executable", ".bin": "Executable", ".app": "Executable",
-    ".msi":   "Executable", ".deb": "Executable", ".rpm": "Executable",
+    ".exe": "Executable",
+    ".dll": "Executable",
+    ".so": "Executable",
+    ".dylib": "Executable",
+    ".bin": "Executable",
+    ".app": "Executable",
+    ".msi": "Executable",
+    ".deb": "Executable",
+    ".rpm": "Executable",
     # Font
-    ".ttf": "Font", ".otf": "Font", ".woff": "Font", ".woff2": "Font", ".eot": "Font",
+    ".ttf": "Font",
+    ".otf": "Font",
+    ".woff": "Font",
+    ".woff2": "Font",
+    ".eot": "Font",
     # Config
-    ".ini":          "Config", ".cfg":          "Config", ".conf": "Config",
-    ".env":          "Config", ".properties":   "Config",
-    ".editorconfig": "Config", ".gitignore":    "Config",
+    ".ini": "Config",
+    ".cfg": "Config",
+    ".conf": "Config",
+    ".env": "Config",
+    ".properties": "Config",
+    ".editorconfig": "Config",
+    ".gitignore": "Config",
 }
 
 # ── Paths ───────────────────────────────────────────────────────────────────
 
-_REPO_ROOT     = Path(__file__).parent.parent
-_FS_DIR        = _REPO_ROOT / "data" / "filesystem"
+_REPO_ROOT = Path(__file__).parent.parent
+_FS_DIR = _REPO_ROOT / "data" / "filesystem"
 _EXCLUDES_FILE = _REPO_ROOT / "data" / "config" / "default_excludes.txt"
-_UNSAFE_CHARS  = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+_UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -147,7 +212,7 @@ def _scan_dir(
 
         try:
             is_file = entry.is_file(follow_symlinks=False)
-            is_dir  = entry.is_dir(follow_symlinks=False)
+            is_dir = entry.is_dir(follow_symlinks=False)
             is_junc = entry.is_junction()  # Windows NTFS junctions (always False on non-Windows)
         except OSError:
             continue
@@ -165,7 +230,7 @@ def _scan_dir(
             key = ext or "(none)"
             cat = CATEGORIES.get(ext, "Other")
 
-            node["size"]       += size
+            node["size"] += size
             node["file_count"] += 1
             node["extensions"][key] = node["extensions"].get(key, 0) + 1
             node["categories"][cat] = node["categories"].get(cat, 0) + 1
@@ -179,7 +244,7 @@ def _scan_dir(
 
             child = _scan_dir(Path(entry.path), depth + 1, depth_limit, excludes, state)
 
-            node["size"]       += child["size"]
+            node["size"] += child["size"]
             node["file_count"] += child["file_count"]
             for k, v in child["extensions"].items():
                 node["extensions"][k] = node["extensions"].get(k, 0) + v
@@ -228,10 +293,10 @@ def explore(args: argparse.Namespace) -> None:
         print(f"Error: not a directory: {root}", file=sys.stderr)
         sys.exit(1)
 
-    raw_name  = _resolve_name(args, root)
+    raw_name = _resolve_name(args, root)
     safe_name = _sanitize(raw_name)
-    excludes  = _build_excludes(args)
-    state     = _build_state(args)
+    excludes = _build_excludes(args)
+    state = _build_state(args)
 
     _FS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _FS_DIR / f"{safe_name}.json"
@@ -239,22 +304,22 @@ def explore(args: argparse.Namespace) -> None:
     print(f"Exploring : {root}")
     if excludes:
         sample = ", ".join(sorted(excludes)[:5])
-        extra  = f" … (+{len(excludes) - 5} more)" if len(excludes) > 5 else ""
+        extra = f" … (+{len(excludes) - 5} more)" if len(excludes) > 5 else ""
         print(f"Excluding : {sample}{extra}")
 
-    t0      = time.monotonic()
-    tree    = _scan_dir(root, depth=0, depth_limit=args.depth, excludes=excludes, state=state)
+    t0 = time.monotonic()
+    tree = _scan_dir(root, depth=0, depth_limit=args.depth, excludes=excludes, state=state)
     elapsed = time.monotonic() - t0
 
     output = {
         "meta": {
-            "name":             raw_name,
-            "root":             str(root),
-            "generated_at":     datetime.now(timezone.utc).isoformat(),
-            "partial":          state.stopped,
-            "total_size":       tree["size"],
-            "total_files":      tree["file_count"],
-            "elapsed_seconds":  round(elapsed, 2),
+            "name": raw_name,
+            "root": str(root),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "partial": state.stopped,
+            "total_size": tree["size"],
+            "total_files": tree["file_count"],
+            "elapsed_seconds": round(elapsed, 2),
         },
         "tree": tree,
     }

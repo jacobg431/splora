@@ -68,10 +68,10 @@ def _make_assets(tmp_path: Path) -> tuple[Path, Path]:
 
 def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     """Create all four directories and monkeypatch the module constants."""
-    fs_dir       = tmp_path / "filesystem"
-    report_dir   = tmp_path / "report"
+    fs_dir = tmp_path / "filesystem"
+    report_dir = tmp_path / "report"
     template_dir = tmp_path / "template"
-    vendor_dir   = tmp_path / "vendor"
+    vendor_dir = tmp_path / "vendor"
 
     fs_dir.mkdir()
     template_dir.mkdir()
@@ -81,10 +81,10 @@ def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         (template_dir / fname).write_text(f"<!-- {fname} -->", encoding="utf-8")
     (vendor_dir / "echarts.min.js").write_text("// echarts", encoding="utf-8")
 
-    monkeypatch.setattr(report_mod, "_FS_DIR",       fs_dir)
-    monkeypatch.setattr(report_mod, "_REPORT_DIR",   report_dir)
+    monkeypatch.setattr(report_mod, "_FS_DIR", fs_dir)
+    monkeypatch.setattr(report_mod, "_REPORT_DIR", report_dir)
     monkeypatch.setattr(report_mod, "_TEMPLATE_DIR", template_dir)
-    monkeypatch.setattr(report_mod, "_VENDOR_DIR",   vendor_dir)
+    monkeypatch.setattr(report_mod, "_VENDOR_DIR", vendor_dir)
 
     return fs_dir, report_dir, template_dir, vendor_dir
 
@@ -164,9 +164,10 @@ class TestReportCommand:
 
         report(_args("my-run"))
 
-        updated_payload = {"meta": {"name": "my-run", "partial": False,
-                                    "total_files": 99, "root": "/new"},
-                           "tree": {}}
+        updated_payload = {
+            "meta": {"name": "my-run", "partial": False, "total_files": 99, "root": "/new"},
+            "tree": {},
+        }
         (fs_dir / "my-run.json").write_text(json.dumps(updated_payload), encoding="utf-8")
 
         report(_args("my-run"))

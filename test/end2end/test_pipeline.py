@@ -47,30 +47,30 @@ class TestExplore:
     def test_extension_distribution_is_correct(self, e2e_pipeline):
         data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
         exts = data["tree"]["extensions"]
-        assert exts.get(".py")   == 1
-        assert exts.get(".txt")  == 1
-        assert exts.get(".png")  == 1
+        assert exts.get(".py") == 1
+        assert exts.get(".txt") == 1
+        assert exts.get(".png") == 1
         assert exts.get(".json") == 1
-        assert exts.get(".mp4")  == 1
+        assert exts.get(".mp4") == 1
 
     def test_category_distribution_is_correct(self, e2e_pipeline):
         data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
         cats = data["tree"]["categories"]
         assert cats.get("Source Code") == 1
-        assert cats.get("Other")       == 1  # .txt
-        assert cats.get("Image")       == 1
-        assert cats.get("Data")        == 1
-        assert cats.get("Video")       == 1
+        assert cats.get("Other") == 1  # .txt
+        assert cats.get("Image") == 1
+        assert cats.get("Data") == 1
+        assert cats.get("Video") == 1
 
     def test_total_size_matches_actual_files(self, e2e_pipeline):
         data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
         # Sum up the sizes of all files we created in _build_scan_tree
         expected = (
-            len(b"print('hello')")         # main.py
+            len(b"print('hello')")  # main.py
             + len(b"Splora end-to-end test")  # readme.txt
             + len(b"\x89PNG" + b"\x00" * 96)  # image.png
-            + len(b'{"key": "value"}')     # data.json
-            + 200                          # video.mp4
+            + len(b'{"key": "value"}')  # data.json
+            + 200  # video.mp4
         )
         assert data["meta"]["total_size"] == expected
 

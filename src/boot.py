@@ -9,16 +9,17 @@ import sys
 import webbrowser
 from pathlib import Path
 
-_REPO_ROOT  = Path(__file__).parent.parent
+_REPO_ROOT = Path(__file__).parent.parent
 _REPORT_DIR = _REPO_ROOT / "data" / "report"
 
-_UNSAFE        = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
-_DEFAULT_PORT  = 5050
+_UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+_DEFAULT_PORT = 5050
 _PORT_ATTEMPTS = 20
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     """SimpleHTTPRequestHandler with per-request logging suppressed."""
+
     def log_message(self, *_) -> None:
         pass
 
