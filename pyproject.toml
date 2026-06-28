@@ -39,6 +39,7 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+tmp_path_retention_policy = "none"
 
 [tool.mypy]
 python_version = "3.13"

@@ -63,8 +63,8 @@ boot:
 ## Implementation Status
 
 - explore.py ✓ — fully implemented and tested (93 unit + integration tests)
-- report.py ✓ — implemented; copies template + vendor + data.json to data/report/<name>/
-- boot.py — stub, next to implement
+- report.py ✓ — implemented and tested (40 unit + integration tests); copies template + vendor + data.json to data/report/<name>/
+- boot.py ✓ — implemented; starts stdlib http.server on first free port ≥5050, opens browser
 
 ## Report folder structure
 
