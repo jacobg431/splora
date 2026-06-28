@@ -57,3 +57,30 @@ The `boot` command will open the generated report in the browser.
 
 This command can be run with the following options:
 - `--name <run-name>` The report folder name under [`data/report`](data/report) to open. Defaults to the last generated report.
+
+## Development
+
+### Running Tests
+
+Install the development dependencies first, then run the full suite:
+
+```
+pip install -e ".[dev]"
+pytest
+```
+
+Tests live under [`test/`](test/), split into two folders:
+
+| Folder | Scope |
+|---|---|
+| `test/unit/` | Individual functions tested in isolation; uses `tmp_path` for any filesystem interaction |
+| `test/integration/` | Full `explore()` command run end-to-end against temporary directory trees |
+
+Useful flags:
+
+```
+pytest -v                              # verbose output
+pytest test/unit/                      # unit tests only
+pytest test/integration/               # integration tests only
+pytest -k "test_fmt_bytes"             # run tests matching a name pattern
+```

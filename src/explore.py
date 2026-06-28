@@ -190,6 +190,31 @@ def _scan_dir(
     return node
 
 
+# ── Argument helpers (extracted for unit testability) ───────────────────────
+
+
+def _resolve_name(args: argparse.Namespace, root: Path) -> str:
+    """Return the run name from CLI args, falling back to the root directory name."""
+    root_label = root.name or re.sub(r"[\\/:]+", "", str(root.drive)) or "root"
+    return args.name or root_label
+
+
+def _build_excludes(args: argparse.Namespace) -> set[str]:
+    """Merge user-supplied --exclude names with the built-in default list."""
+    excludes: set[str] = set(args.exclude or [])
+    if not getattr(args, "no_default_excludes", False):
+        excludes |= _load_default_excludes()
+    return excludes
+
+
+def _build_state(args: argparse.Namespace) -> _State:
+    """Construct a traversal _State from CLI args."""
+    return _State(
+        max_files=getattr(args, "max_files", None),
+        deadline=(time.monotonic() + args.timeout) if getattr(args, "timeout", None) else None,
+    )
+
+
 # ── Public entry point ──────────────────────────────────────────────────────
 
 
@@ -203,20 +228,10 @@ def explore(args: argparse.Namespace) -> None:
         print(f"Error: not a directory: {root}", file=sys.stderr)
         sys.exit(1)
 
-    # Name: prefer --name, fall back to folder name, then sanitised drive letter
-    root_label = root.name or re.sub(r"[\\/:]+", "", str(root.drive)) or "root"
-    raw_name   = args.name or root_label
-    safe_name  = _sanitize(raw_name)
-
-    # Exclude set: user-supplied + (optionally) built-in defaults
-    excludes: set[str] = set(args.exclude or [])
-    if not getattr(args, "no_default_excludes", False):
-        excludes |= _load_default_excludes()
-
-    state = _State(
-        max_files=getattr(args, "max_files", None),
-        deadline=(time.monotonic() + args.timeout) if getattr(args, "timeout", None) else None,
-    )
+    raw_name  = _resolve_name(args, root)
+    safe_name = _sanitize(raw_name)
+    excludes  = _build_excludes(args)
+    state     = _build_state(args)
 
     _FS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = _FS_DIR / f"{safe_name}.json"

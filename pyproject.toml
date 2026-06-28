@@ -37,6 +37,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 
+[tool.pytest.ini_options]
+testpaths = ["test"]
+
 [tool.mypy]
 python_version = "3.13"
 strict = true
