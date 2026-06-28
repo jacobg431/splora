@@ -94,3 +94,54 @@ pytest test/end2end/
 ```
 
 The suite invokes `explore` and `report` as real subprocesses, starts the HTTP server in a background thread, runs assertions against all three stages, and deletes the `splora-e2e` run artifacts from `data/` on teardown.
+
+## For Code Agents
+
+This section documents the conventions that any AI agent (regardless of model or provider) must follow when working on this project.
+
+### The `agent/` Folder
+
+[`agent/`](agent/) is the agent's dedicated workspace. It contains two required files and one scratch area:
+
+| Path | Purpose |
+|---|---|
+| [`agent/log.md`](agent/log.md) | Append-only activity log. One line per entry. |
+| [`agent/notes.md`](agent/notes.md) | Living document of design decisions, architecture, and implementation status. |
+| [`agent/temp/`](agent/temp/) | Git-ignored scratch space for throwaway files. Safe to write freely. |
+
+### Logging Requirements
+
+Every time an agent makes a change to the project — writing or editing files, running commands with side effects, or modifying configuration — it **must** append an entry to [`agent/log.md`](agent/log.md) using this format:
+
+```
+[YYYY-MM-DD] <intent> | <action taken> | <outcome>
+```
+
+Examples:
+```
+[2026-06-28] Implement explore.py | Wrote src/explore.py with os.scandir traversal | Smoke tests passed
+[2026-06-28] Fix pytest tmp cleanup on Windows | Added tmp_path_retention_policy = "none" to pyproject.toml | Confirmed by user: PermissionError resolved
+```
+
+Log entries must be accurate. Do not omit entries for failed attempts — record what was tried and what went wrong.
+
+### Notes Requirements
+
+[`agent/notes.md`](agent/notes.md) is the agent's memory of decisions that are not obvious from the code itself. The agent **must**:
+
+- Read `agent/notes.md` at the start of each session to restore context.
+- Update it whenever a design decision is made, a constraint is discovered, or the implementation status of a module changes.
+- Keep it current — stale information is worse than no information.
+
+The notes file is not a log. It records *what is true now*, not *what happened*. Superseded decisions should be replaced, not appended.
+
+### General Guidelines
+
+- **Do not create files outside `agent/`** without explicit user approval. Ask first; implement after.
+- **Do not modify `agent/log.md` retroactively.** Entries are append-only.
+- **Prefer the existing test conventions** (`pytest`, `tmp_path`, `monkeypatch`) over introducing new testing frameworks.
+- **Prefer stdlib** over third-party dependencies. If a new dependency is necessary, discuss it with the user before adding it to `pyproject.toml`.
+- **Do not open browsers, send network requests, or modify files outside the repository** without explicit instruction.
+- **Keep the test suite green.** Run `pytest` before reporting a task as complete. If tests fail and you cannot fix them, say so explicitly.
+- **Always add a log entry** when making a change to the repo before reporting a task as complete.
+- **Python version is 3.13.** Do not use syntax or APIs that require a newer version or that were removed in 3.13.
