@@ -4,7 +4,9 @@ This document outlines the features that Splora must have, and the progress towa
 
 ---
 
-## MVP Features (To Be Implemented)
+## MVP Features ✓
+
+All MVP features are implemented as of 2026-06-28.
 
 ### CLI
 
@@ -106,13 +108,28 @@ Each file is assigned exactly one category based on its extension.
 
 ### Boot
 
-- Open `data/report/<name>/index.html` in the system default browser using Python's `webbrowser` module
+- Find the first available TCP port starting at 5050
+- Serve `data/report/<name>/` via `http.server.SimpleHTTPRequestHandler` (suppressing per-request logs)
+- Open `http://localhost:<port>/` in the system default browser via `webbrowser.open()`
+- Serving over HTTP (rather than `file://`) avoids browser security restrictions on local JS modules
 
 ---
 
 ## Implemented Features
 
-Project still in initial setup phase. There are currently no implemented features.
+| Component | Status | Notes |
+|---|---|---|
+| `splora explore` | ✓ | `os.scandir` traversal; atomic JSON write; all CLI flags; partial flag on early stop |
+| `splora report` | ✓ | Copies template + vendor assets; writes `data.json`; `--name` or last-modified fallback |
+| `splora boot` | ✓ | `http.server` on first free port ≥5050; `webbrowser.open()`; quiet request logging |
+| Frontend UI | ✓ | ECharts treemap with drill-down; bidirectional folder tree sync; extension + category pie charts |
+| pip entry point | ✓ | `splora` command available after `pip install -e .` |
+| Default excludes | ✓ | `data/config/default_excludes.txt`; overridable with `--no-default-excludes` |
+| Vendored ECharts | ✓ | `vendor/echarts.min.js` committed; copied into each report for offline use |
+| Unit tests | ✓ | 125 tests across `explore`, `report`, `boot` |
+| Integration tests | ✓ | 50 tests; monkeypatched path constants; no coupling to real `data/` directories |
+| End-to-end tests | ✓ | 24 tests; real subprocesses + daemon HTTP server; artifacts deleted on teardown |
+| GitHub CI | ✓ | PR-triggered; ubuntu + windows runners; separate steps per test tier; `ruff format --check` |
 
 ---
 
