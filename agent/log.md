@@ -9,3 +9,4 @@ One line per entry: `[date] INTENT | ACTION | OUTCOME`
 [2026-06-28] Rename script.json | mv data/template/script.json → script.js | Done; greenlit by user
 [2026-06-28] Write planning files | Created pyproject.toml, updated SPLORA_PLAN.md, data/config/default_excludes.txt, README.md | All four files written; project ready for implementation
 [2026-06-28] Implement initial coding tasks | pip install -e .[dev], src/__init__.py, splora.py, index.html, style.css, script.js, vendor/echarts.min.js, stub boot/explore/report.py | All files created; splora --help verified working
+[2026-06-28] Implement explore.py | Recursive os.scandir traversal, _State dataclass, CATEGORIES map, limit flags, atomic JSON write | All smoke tests passed: default excludes, --max-files, --timeout, --depth, partial flag
