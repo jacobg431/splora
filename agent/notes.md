@@ -52,11 +52,16 @@ Key constraint: the folder tree already manages a `nodeById` map with `_parent` 
 
 Decision pending. Constraints: no build step; each file must be copyable into `data/report/<name>/vendor/` for offline use.
 
-**Decision: Bootstrap 5 CSS-only.** Vendor file: `vendor/bootstrap.min.css`. No Bootstrap JS bundle needed. `splora report` must copy it alongside `echarts.min.js`. Apply Bootstrap utility classes directly in `index.html`; keep custom overrides in `style.css`.
+**Decision: Bootstrap 5 CSS-only. ✓ Implemented.**
+- `vendor/bootstrap.min.css` (Bootstrap 5.3.3, 232 KB) committed to repo
+- `report.py` copies it into `data/report/<name>/vendor/` alongside ECharts
+- `index.html` uses Bootstrap utility classes: `d-flex`, `flex-*`, `overflow-*`, `bg-white`, `border-*`, `p-3`, `text-*`, `fw-*`, `font-monospace`, `text-truncate`, `badge bg-warning`
+- `style.css` reduced to design tokens + header/tree/info-panel/chart custom rules only
+- 2 new tests added: `test_missing_bootstrap_is_reported` (unit), `test_missing_bootstrap_exits_with_code_1` (integration)
 
 ### Track 3: Dashboard Beautification
 
-Pending framework choice. Work includes: color palette, typography scale, treemap label handling, pie chart tooltips/legends, info panel stat cards, hover/focus states, drill-down transition animation.
+Framework (Bootstrap 5) now in place. Work includes: color palette, typography scale, treemap label handling, pie chart tooltips/legends, info panel stat cards, hover/focus states, drill-down transition animation. Not yet started.
 
 ---
 

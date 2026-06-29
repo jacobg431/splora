@@ -4,47 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Splora</title>
+    <link rel="stylesheet" href="vendor/bootstrap.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <header id="header">
-        <span id="run-name">Splora</span>
-        <div id="header-meta">
+<body class="d-flex flex-column overflow-hidden">
+
+    <header id="header" class="d-flex align-items-center justify-content-between px-3 flex-shrink-0">
+        <span id="run-name" class="fw-semibold text-truncate me-3">Splora</span>
+        <div id="header-meta" class="d-flex align-items-center gap-2 flex-shrink-0 text-nowrap">
             <span id="meta-root"></span>
-            <span class="sep">·</span>
+            <span class="opacity-50">·</span>
             <span id="meta-files"></span>
-            <span class="sep">·</span>
+            <span class="opacity-50">·</span>
             <span id="meta-size"></span>
-            <span id="meta-partial" class="badge-warning hidden">Partial scan</span>
+            <span id="meta-partial" class="badge bg-warning text-dark ms-1 hidden">Partial scan</span>
         </div>
     </header>
 
-    <div id="layout">
-        <aside id="tree-panel">
+    <div id="layout" class="d-flex flex-grow-1 overflow-hidden">
+        <aside id="tree-panel" class="flex-shrink-0 overflow-y-auto bg-white border-end">
             <div id="tree-root"></div>
         </aside>
 
-        <div id="right-panel">
-            <div id="treemap-container"></div>
+        <div id="right-panel" class="d-flex flex-column flex-grow-1 overflow-hidden">
+            <div id="treemap-container" class="flex-grow-1"></div>
 
-            <div id="info-panel">
-                <div id="info-summary">
-                    <div id="info-name"></div>
-                    <div id="info-path"></div>
-                    <div id="info-stats">
+            <div id="info-panel" class="d-flex flex-shrink-0 bg-white border-top">
+                <div id="info-summary" class="flex-shrink-0 p-3 border-end overflow-hidden">
+                    <div id="info-name" class="fw-semibold text-truncate"></div>
+                    <div id="info-path" class="text-muted font-monospace text-truncate mt-1"></div>
+                    <div id="info-stats" class="d-flex gap-4 mt-3">
                         <div class="stat">
-                            <div class="stat-label">Total size</div>
-                            <div id="stat-size" class="stat-value">—</div>
+                            <div class="stat-label text-muted text-uppercase">Total size</div>
+                            <div id="stat-size" class="stat-value fw-bold">—</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-label">Files</div>
-                            <div id="stat-count" class="stat-value">—</div>
+                            <div class="stat-label text-muted text-uppercase">Files</div>
+                            <div id="stat-count" class="stat-value fw-bold">—</div>
                         </div>
                     </div>
                 </div>
-                <div id="info-charts">
-                    <div id="chart-ext"></div>
-                    <div id="chart-cat"></div>
+                <div id="info-charts" class="d-flex flex-grow-1">
+                    <div id="chart-ext" class="flex-grow-1"></div>
+                    <div id="chart-cat" class="flex-grow-1"></div>
                 </div>
             </div>
         </div>

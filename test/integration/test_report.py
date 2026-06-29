@@ -62,6 +62,7 @@ def _make_assets(tmp_path: Path) -> tuple[Path, Path]:
     vendor_dir = tmp_path / "vendor"
     vendor_dir.mkdir()
     (vendor_dir / "echarts.min.js").write_text("// echarts", encoding="utf-8")
+    (vendor_dir / "bootstrap.min.css").write_text("/* bootstrap */", encoding="utf-8")
 
     return template_dir, vendor_dir
 
@@ -80,6 +81,7 @@ def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     for fname in ("index.html", "style.css", "script.js"):
         (template_dir / fname).write_text(f"<!-- {fname} -->", encoding="utf-8")
     (vendor_dir / "echarts.min.js").write_text("// echarts", encoding="utf-8")
+    (vendor_dir / "bootstrap.min.css").write_text("/* bootstrap */", encoding="utf-8")
 
     monkeypatch.setattr(report_mod, "_FS_DIR", fs_dir)
     monkeypatch.setattr(report_mod, "_REPORT_DIR", report_dir)
@@ -105,6 +107,7 @@ class TestReportCommand:
         assert (out / "script.js").exists()
         assert (out / "data.json").exists()
         assert (out / "vendor" / "echarts.min.js").exists()
+        assert (out / "vendor" / "bootstrap.min.css").exists()
 
     def test_data_json_content_matches_source(self, tmp_path: Path, monkeypatch):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
@@ -153,6 +156,15 @@ class TestReportCommand:
         fs_dir, _, _, vendor_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         (vendor_dir / "echarts.min.js").unlink()
+
+        with pytest.raises(SystemExit) as exc:
+            report(_args("my-run"))
+        assert exc.value.code == 1
+
+    def test_missing_bootstrap_exits_with_code_1(self, tmp_path: Path, monkeypatch):
+        fs_dir, _, _, vendor_dir = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        (vendor_dir / "bootstrap.min.css").unlink()
 
         with pytest.raises(SystemExit) as exc:
             report(_args("my-run"))

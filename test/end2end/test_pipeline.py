@@ -87,6 +87,7 @@ class TestReport:
         for fname in ("index.html", "style.css", "script.js", "data.json"):
             assert (d / fname).exists(), f"Missing: {fname}"
         assert (d / "vendor" / "echarts.min.js").exists()
+        assert (d / "vendor" / "bootstrap.min.css").exists()
 
     def test_data_json_content_matches_filesystem_json(self, e2e_pipeline):
         src = e2e_pipeline["json_path"].read_text(encoding="utf-8")
@@ -98,6 +99,7 @@ class TestReport:
         assert "style.css" in html
         assert "script.js" in html
         assert "vendor/echarts.min.js" in html
+        assert "vendor/bootstrap.min.css" in html
 
     def test_no_extra_files_in_report_root(self, e2e_pipeline):
         top = {p.name for p in e2e_pipeline["report_dir"].iterdir()}

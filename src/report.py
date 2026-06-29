@@ -66,6 +66,8 @@ def _missing_assets(template_dir: Path, vendor_dir: Path) -> list[str]:
     missing = [f for f in _TEMPLATE_FILES if not (template_dir / f).exists()]
     if not (vendor_dir / "echarts.min.js").exists():
         missing.append("vendor/echarts.min.js")
+    if not (vendor_dir / "bootstrap.min.css").exists():
+        missing.append("vendor/bootstrap.min.css")
     return missing
 
 
@@ -83,6 +85,7 @@ def _build_report(
         shutil.copy2(template_dir / fname, out_dir / fname)
 
     shutil.copy2(vendor_dir / "echarts.min.js", out_dir / "vendor" / "echarts.min.js")
+    shutil.copy2(vendor_dir / "bootstrap.min.css", out_dir / "vendor" / "bootstrap.min.css")
     (out_dir / "data.json").write_text(raw_json, encoding="utf-8")
 
 
