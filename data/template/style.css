@@ -11,13 +11,13 @@
     --sel-bg:    #eff6ff;
     --sel-fg:    #1d4ed8;
     --bg:        #f0f2f5;
-    --border:    var(--bs-border-color, #dee2e6);
+    --border:    #111827;
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
 
 html, body {
-    height: 100%;
+    min-height: 100vh;
     overflow: hidden;
     font-size: 14px;
     color: var(--text);
@@ -45,6 +45,7 @@ html, body {
     flex: 1 1 0;
     min-height: 0;
     display: grid;
+    gap: 8px;
     padding: 24px 24px;
 }
 
@@ -66,11 +67,7 @@ html, body {
             "summary summary summary";
     }
 
-    #tree-panel    { border-right: 1px solid var(--border); }
-    #charts-panel  { border-left: 1px solid var(--border); flex-direction: column; padding: 0 16px; }
-    #summary-panel { border-top: 1px solid var(--border); flex-direction: row; }
-    #info-card     { flex-grow: 1; }
-}
+    #charts-panel  { flex-direction: column; padding: 0 16px; }}
 
 /*
  * < 1024 px — two-column, two-row grid
@@ -90,19 +87,16 @@ html, body {
             "summary charts";
     }
 
-    #tree-panel    { border-right: 1px solid var(--border); }
-    #summary-panel { border-top: 1px solid var(--border); border-right: 1px solid var(--border);
-                     flex-direction: column; overflow-y: auto; }
-    #charts-panel  { border-top: 1px solid var(--border); flex-direction: row;
-                     min-height: var(--charts-h); }
+    #summary-panel { flex-direction: column; overflow-y: auto; }
+    #charts-panel  { flex-direction: row; min-height: var(--charts-h); }
 }
 
 /* ── Grid item assignments ───────────────────────────────────────────────── */
 
-#tree-panel        { grid-area: tree;    overflow-y: auto; }
+#tree-panel        { grid-area: tree; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
 #treemap-container { grid-area: treemap; min-height: 0; min-width: 0; overflow: hidden; }
-#charts-panel      { grid-area: charts;  display: flex;  min-height: 0; min-width: 0; overflow: hidden; }
-#summary-panel     { grid-area: summary; display: flex; }
+#charts-panel      { grid-area: charts; display: flex;  min-height: 0; min-width: 0; overflow: hidden; }
+#summary-panel     { grid-area: summary; display: flex; justify-content: space-between; }
 
 #chart-ext,
 #chart-cat { flex: 1; min-width: 0; min-height: 0; }
@@ -122,7 +116,7 @@ html, body {
     min-width: 0;
 }
 
-.tree-row:hover  { background: #f9fafb; }
+.tree-row:hover  { background: var(--sel-bg); }
 .tree-row.active { background: var(--sel-bg); color: var(--sel-fg); font-weight: 500; }
 
 .caret {
@@ -155,7 +149,8 @@ html, body {
 #info-name { font-size: 15px; }
 #info-path { font-size: 11px; }
 
-.stat-card { flex-shrink: 0; }
+.stat-card { border: 1px solid var(--border);}
+.info-card { border: 1px solid var(--border);}
 
 .stat-label {
     font-size: 10px;
