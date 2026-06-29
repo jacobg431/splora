@@ -1,16 +1,17 @@
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 
 :root {
-    --header-h:        48px;
-    --tree-w:         280px;
-    --info-h:         260px;
-    --info-summary-w: 220px;
-    --header-bg:      #1e2030;
-    --text:           #111827;
-    --muted:          #6b7280;
-    --sel-bg:         #eff6ff;
-    --sel-fg:         #1d4ed8;
-    --bg:             #f0f2f5;
+    --header-h:  48px;
+    --tree-w:   280px;
+    --charts-w: 260px;  /* width of chart column at ≥ 1024 px               */
+    --charts-h: 220px;  /* height of chart row   at <  1024 px               */
+    --header-bg: #1e2030;
+    --text:      #111827;
+    --muted:     #6b7280;
+    --sel-bg:    #eff6ff;
+    --sel-fg:    #1d4ed8;
+    --bg:        #f0f2f5;
+    --border:    var(--bs-border-color, #dee2e6);
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
@@ -38,9 +39,74 @@ html, body {
     color: #9ca3af;
 }
 
-/* ── Folder tree ─────────────────────────────────────────────────────────── */
+/* ── Layout: CSS Grid ────────────────────────────────────────────────────── */
 
-#tree-panel { width: var(--tree-w); }
+#layout {
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+}
+
+/*
+ * ≥ 1024 px — three-column, two-row grid
+ *
+ *  ┌────────────┬──────────────────────────┬────────────┐
+ *  │  tree      │  treemap                 │  charts    │  1fr
+ *  ├────────────┴──────────────────────────┴────────────┤
+ *  │  summary (spans all three columns)                 │  auto
+ *  └────────────────────────────────────────────────────┘
+ */
+@media (min-width: 1024px) {
+    #layout {
+        grid-template-columns: var(--tree-w) 1fr var(--charts-w);
+        grid-template-rows: 1fr auto;
+        grid-template-areas:
+            "tree treemap charts"
+            "summary summary summary";
+    }
+
+    #tree-panel    { border-right: 1px solid var(--border); }
+    #charts-panel  { border-left: 1px solid var(--border); flex-direction: column; }
+    #summary-panel { border-top: 1px solid var(--border); flex-direction: row; }
+    #info-card     { flex-grow: 1; }
+}
+
+/*
+ * < 1024 px — two-column, two-row grid
+ *
+ *  ┌────────────┬──────────────────────────────────────┐
+ *  │  tree      │  treemap                             │  1fr
+ *  ├────────────┼──────────────────────────────────────┤
+ *  │  summary   │  charts (side-by-side)               │  auto
+ *  └────────────┴──────────────────────────────────────┘
+ */
+@media (max-width: 1023px) {
+    #layout {
+        grid-template-columns: var(--tree-w) 1fr;
+        grid-template-rows: 1fr auto;
+        grid-template-areas:
+            "tree    treemap"
+            "summary charts";
+    }
+
+    #tree-panel    { border-right: 1px solid var(--border); }
+    #summary-panel { border-top: 1px solid var(--border); border-right: 1px solid var(--border);
+                     flex-direction: column; overflow-y: auto; }
+    #charts-panel  { border-top: 1px solid var(--border); flex-direction: row;
+                     min-height: var(--charts-h); }
+}
+
+/* ── Grid item assignments ───────────────────────────────────────────────── */
+
+#tree-panel        { grid-area: tree;    overflow-y: auto; }
+#treemap-container { grid-area: treemap; min-height: 0; min-width: 0; overflow: hidden; }
+#charts-panel      { grid-area: charts;  display: flex;  min-height: 0; min-width: 0; overflow: hidden; }
+#summary-panel     { grid-area: summary; display: flex; }
+
+#chart-ext,
+#chart-cat { flex: 1; min-width: 0; min-height: 0; }
+
+/* ── Folder tree ─────────────────────────────────────────────────────────── */
 
 #tree-root { padding: 4px 0; }
 
@@ -83,18 +149,12 @@ html, body {
 
 .tree-children.collapsed { display: none; }
 
-/* ── Treemap ─────────────────────────────────────────────────────────────── */
-
-#treemap-container { min-height: 0; }
-
-/* ── Info panel ──────────────────────────────────────────────────────────── */
-
-#info-panel    { height: var(--info-h); }
-#info-summary  { width: var(--info-summary-w); }
+/* ── Summary panel ───────────────────────────────────────────────────────── */
 
 #info-name { font-size: 15px; }
-
 #info-path { font-size: 11px; }
+
+.stat-card { flex-shrink: 0; }
 
 .stat-label {
     font-size: 10px;
@@ -102,8 +162,6 @@ html, body {
 }
 
 .stat-value { font-size: 18px; }
-
-#info-charts > div { min-width: 0; }
 
 /* ── Utilities ───────────────────────────────────────────────────────────── */
 
