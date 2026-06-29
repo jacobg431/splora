@@ -191,6 +191,7 @@ function initTreemap(root) {
         series: [{
             type: 'treemap',
             id: 'main',
+            left: 0, right: 0, top: 0, bottom: 0,
             roam: false,
             nodeClick: 'zoomToNode',
             data: [toTreemapItem(root)],
@@ -280,6 +281,13 @@ async function init() {
     selectNode(tree.path, 'init');
 
     window.addEventListener('resize', () => {
+        treemap?.resize();
+        extChart?.resize();
+        catChart?.resize();
+    });
+
+    // Resize after the first paint so ECharts reads final CSS Grid dimensions.
+    requestAnimationFrame(() => {
         treemap?.resize();
         extChart?.resize();
         catChart?.resize();
