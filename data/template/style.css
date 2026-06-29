@@ -5,6 +5,8 @@
     --tree-w:   280px;
     --charts-w: 260px;  /* width of chart column at ≥ 1024 px               */
     --charts-h: 220px;  /* height of chart row   at <  1024 px               */
+    --card-h:   140px;
+    --card-w:   calc(var(--card-h) * 1.618); /* golden ratio ≈ 226 px        */
     --header-bg: #1e2030;
     --text:      #111827;
     --muted:     #6b7280;
@@ -87,7 +89,7 @@ html, body {
             "summary charts";
     }
 
-    #summary-panel { flex-direction: column; overflow-y: auto; }
+    #summary-panel { flex-direction: column; overflow-y: auto; justify-content: flex-start; }
     #charts-panel  { flex-direction: row; min-height: var(--charts-h); }
 }
 
@@ -158,6 +160,19 @@ html, body {
 }
 
 .stat-value { font-size: 18px; }
+
+#summary-panel .card {
+    width: var(--card-w);
+    height: var(--card-h);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+#summary-panel .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
 
 /* ── Utilities ───────────────────────────────────────────────────────────── */
 
