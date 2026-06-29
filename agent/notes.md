@@ -33,9 +33,36 @@ Three-step pipeline:
 - Optional limits: `--max-files`, `--timeout`, `--depth`, `--exclude`
 - Default exclude list covers `.git`, `node_modules`, `venv`, etc.
 
+## Frontend Overhaul (branch: `frontend-overhaul`)
+
+Three tracks of active UI/UX work. No implementation has started yet; all tracks are pending decisions and green light.
+
+### Track 1: Treemap Drill-Down
+
+Replace `nodeClick: 'zoomToNode'` (in-place zoom) with a proper drill-down:
+- `currentRoot` JS variable tracks the visible level
+- On click → `treemap.setOption({ series: [{ data: currentRoot.children.map(toTreemapItem) }] })`
+- Manual breadcrumb built from `currentRoot._parent` chain, rendered above the treemap
+- Remove ECharts' built-in `breadcrumb` config
+- Bidirectional sync with folder tree unchanged
+
+Key constraint: the folder tree already manages a `nodeById` map with `_parent` back-references — reuse this for breadcrumb construction.
+
+### Track 2: CSS Framework
+
+Decision pending. Constraints: no build step; each file must be copyable into `data/report/<name>/vendor/` for offline use.
+
+**Decision: Bootstrap 5 CSS-only.** Vendor file: `vendor/bootstrap.min.css`. No Bootstrap JS bundle needed. `splora report` must copy it alongside `echarts.min.js`. Apply Bootstrap utility classes directly in `index.html`; keep custom overrides in `style.css`.
+
+### Track 3: Dashboard Beautification
+
+Pending framework choice. Work includes: color palette, typography scale, treemap label handling, pie chart tooltips/legends, info panel stat cards, hover/focus states, drill-down transition animation.
+
+---
+
 ## Implementation Status
 
-All MVP features complete as of 2026-06-28.
+All MVP features complete as of 2026-06-28. Frontend overhaul is next (branch: `frontend-overhaul`).
 
 - `explore.py` ✓ — fully implemented and tested (85 unit + 10 integration tests)
 - `report.py` ✓ — fully implemented and tested (30 unit + 10 integration tests)

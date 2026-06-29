@@ -133,6 +133,48 @@ Each file is assigned exactly one category based on its extension.
 
 ---
 
+## Frontend Overhaul (Active — branch: `frontend-overhaul`)
+
+Three tracks replacing the MVP UI with a polished, production-quality report experience.
+
+### Track 1: Treemap Drill-Down
+
+**Goal:** Replace the current zoom-in model with a proper nested drill-down navigation.
+
+**Current behavior:** ECharts `nodeClick: 'zoomToNode'` shrinks the treemap in-place; parent nodes remain visible as a shrunken surrounding context with a breadcrumb bar at the bottom.
+
+**Target behavior:**
+- Click a folder rectangle → treemap resets to show only that folder's direct children at 100% canvas size
+- A breadcrumb bar (top of treemap) shows the path back to root (e.g. `root / src / components`)
+- Clicking any breadcrumb segment navigates back up to that level
+- Folder tree panel stays bidirectionally synced as before
+
+**Implementation approach:** Maintain a `currentRoot` pointer in JS state. On click, update `currentRoot` and re-render the treemap with `setOption` using only that node's children as data. Build breadcrumb from `currentRoot._parent` chain. Remove ECharts' built-in breadcrumb.
+
+---
+
+### Track 2: CSS Framework
+
+**Goal:** Adopt a CSS framework to unify spacing, typography, and component styles across the report. Must be vendorable (offline, no build step).
+
+**Decision: Bootstrap 5 (CSS-only).** Vendored as `vendor/bootstrap.min.css` (~30 KB gz). No Bootstrap JS needed — all interactivity is handled by ECharts and custom script.js. Copied into each report folder by `splora report` alongside ECharts.
+
+---
+
+### Track 3: Dashboard Beautification
+
+**Goal:** Make the report pleasant to look at and interact with.
+
+- Cohesive color palette across treemap, pie charts, and UI chrome
+- Improved typography — font scale, weight, line-height
+- Treemap label polish — legible at all rectangle sizes, overflow handled gracefully
+- Pie chart improvements — better label placement, styled tooltips, optional legend
+- Info panel redesign — clear stat hierarchy, visual weight on key numbers
+- Hover and focus states on all interactive elements
+- Smooth transition on drill-down navigation
+
+---
+
 ## Deferred Features
 
 - Multi-run comparison view (display two exploration runs side by side)
