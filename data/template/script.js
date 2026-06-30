@@ -43,6 +43,10 @@ function toTreemapItem(node) {
 
 // ── Folder tree ────────────────────────────────────────────────────────────
 
+// Bootstrap Icons "chevron-right" (MIT) — inlined to avoid vendoring the full icon font.
+const CHEVRON_SVG = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" xmlns="http://www.w3.org/2000/svg">' +
+    '<path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
+
 function buildTreeItem(node, depth) {
     const hasDirs = node.children?.length > 0;
 
@@ -58,17 +62,13 @@ function buildTreeItem(node, depth) {
 
     const caret = document.createElement('span');
     caret.className = hasDirs ? 'caret' : 'caret leaf';
-    caret.textContent = hasDirs ? '▶' : '';
-
-    const icon = document.createElement('span');
-    icon.className = 'tree-icon';
-    icon.textContent = '📁';
+    if (hasDirs) caret.innerHTML = CHEVRON_SVG;
 
     const label = document.createElement('span');
     label.className = 'tree-label';
     label.textContent = node.name;
 
-    row.append(caret, icon, label);
+    row.append(caret, label);
     item.append(row);
     row.addEventListener('click', () => selectNode(node.path, 'tree'));
 
