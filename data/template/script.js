@@ -84,7 +84,7 @@ function buildTreeItem(node, depth) {
                 kids.dataset.rendered = '1';
             }
             const nowOpen = kids.classList.toggle('collapsed') === false;
-            caret.textContent = nowOpen ? '▼' : '▶';
+            caret.classList.toggle('open', nowOpen);
         });
     }
 
@@ -109,7 +109,7 @@ function expandToPath(targetPath) {
         }
         kids.classList.remove('collapsed');
         const caret = el.querySelector(':scope > .tree-row > .caret');
-        if (caret) caret.textContent = '▼';
+        if (caret) caret.classList.add('open');
     }
 }
 
@@ -220,9 +220,19 @@ function initTreemap(root) {
     });
 }
 
+// ── Sidebar ────────────────────────────────────────────────────────────────
+
+function initSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const toggle  = document.getElementById('sidebar-toggle');
+    toggle?.addEventListener('click', () => sidebar?.classList.toggle('collapsed'));
+}
+
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
 async function init() {
+    initSidebar();
+
     let data;
     try {
         const res = await fetch('./data.json');
@@ -244,13 +254,7 @@ async function init() {
 
     const { meta, tree } = data;
 
-    // Header
     document.title = meta.name ?? 'Splora';
-    document.getElementById('run-name').textContent   = meta.name   ?? 'Splora';
-    document.getElementById('meta-root').textContent  = meta.root   ?? '';
-    document.getElementById('meta-files').textContent = fmtCount(meta.total_files) + ' files';
-    document.getElementById('meta-size').textContent  = formatBytes(meta.total_size);
-    if (meta.partial) document.getElementById('meta-partial').classList.remove('hidden');
 
     // Register all nodes with parent back-references
     registerAll(tree, null);
@@ -267,7 +271,7 @@ async function init() {
             tree.children.forEach(c => kids.append(buildTreeItem(c, 1)));
             kids.dataset.rendered = '1';
             kids.classList.remove('collapsed');
-            if (caret) caret.textContent = '▼';
+            if (caret) caret.classList.add('open');
         }
     }
 

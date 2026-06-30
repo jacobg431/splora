@@ -7,61 +7,72 @@
     <link rel="stylesheet" href="vendor/bootstrap.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="d-flex flex-column overflow-hidden">
+<body class="d-flex overflow-hidden">
 
-    <header id="header" class="d-flex align-items-center justify-content-between px-3 flex-shrink-0">
-        <span id="run-name" class="fw-semibold text-truncate me-3">Splora</span>
-        <div id="header-meta" class="d-flex align-items-center gap-2 flex-shrink-0 text-nowrap">
-            <span id="meta-root"></span>
-            <span class="opacity-50">·</span>
-            <span id="meta-files"></span>
-            <span class="opacity-50">·</span>
-            <span id="meta-size"></span>
-            <span id="meta-partial" class="badge bg-warning text-dark ms-1 hidden">Partial scan</span>
+    <!-- Collapsible side menu. Expanded: logo + wordmark + folder tree.
+         Collapsed: logo icon only, just wide enough to stay visible. -->
+    <aside id="sidebar" class="d-flex flex-column flex-shrink-0">
+        <div id="sidebar-header" class="d-flex align-items-center">
+            <div id="sidebar-brand" class="d-flex align-items-center">
+                <span id="logo-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2"  y="2"  width="10" height="10" rx="1.5" fill="currentColor"/>
+                        <rect x="13" y="2"  width="9"  height="6"  rx="1.5" fill="currentColor" opacity="0.7"/>
+                        <rect x="13" y="9"  width="9"  height="3"  rx="1.5" fill="currentColor" opacity="0.5"/>
+                        <rect x="2"  y="13" width="20" height="9"  rx="1.5" fill="currentColor" opacity="0.35"/>
+                    </svg>
+                </span>
+                <span id="logo-text">Splora</span>
+            </div>
+            <button id="sidebar-toggle" type="button" aria-label="Collapse sidebar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
         </div>
-    </header>
-
-    <!-- CSS Grid layout — cells are tree-panel, treemap-container, charts-panel, summary-panel.
-         The grid template changes at 1024 px; see style.css for both breakpoints. -->
-    <div id="layout" class="gap-4">
-
-        <aside id="tree-panel" class="overflow-y-auto">
+        <div id="sidebar-tree" class="overflow-y-auto">
             <div id="tree-root"></div>
-        </aside>
-
-        <div id="treemap-container"></div>
-
-        <!-- ≥ 1024 px: stacked vertically right of treemap.
-             <  1024 px: side-by-side below the treemap. -->
-        <div id="charts-panel" class="bg-white">
-            <div id="chart-ext"></div>
-            <div id="chart-cat"></div>
         </div>
+    </aside>
 
-        <!-- ≥ 1024 px: full-width row below the top section, cards laid out horizontally.
-             <  1024 px: left column below the folder tree, cards stacked vertically. -->
-        <div id="summary-panel" class="bg-white py-2 gap-4">
-            <div class="card stat-card">
-                <div class="card-body py-2 px-3 text-center">
-                    <div class="stat-label text-muted text-uppercase">Folder</div>
-                    <div id="stat-folder" class="stat-value fw-bold">—</div>
+    <main id="main" class="d-flex flex-column flex-grow-1 overflow-hidden">
+        <div id="layout" class="gap-4">
+
+            <div id="treemap-container"></div>
+
+            <!-- ≥ 1024 px: stacked vertically right of treemap.
+                 <  1024 px: side-by-side below the treemap. -->
+            <div id="charts-panel" class="bg-white">
+                <div id="chart-ext"></div>
+                <div id="chart-cat"></div>
+            </div>
+
+            <!-- ≥ 1024 px: full-width row below the top section, cards laid out horizontally.
+                 <  1024 px: below charts, wraps as needed. -->
+            <div id="summary-panel" class="bg-white py-2">
+                <div class="card stat-card">
+                    <div class="card-body py-2 px-3 text-center">
+                        <div class="stat-label text-muted text-uppercase">Folder</div>
+                        <div id="stat-folder" class="stat-value fw-bold">—</div>
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="card-body py-2 px-3 text-center">
+                        <div class="stat-label text-muted text-uppercase">Total size</div>
+                        <div id="stat-size" class="stat-value fw-bold">—</div>
+                    </div>
+                </div>
+                <div class="card stat-card">
+                    <div class="card-body py-2 px-3 text-center">
+                        <div class="stat-label text-muted text-uppercase">Files</div>
+                        <div id="stat-count" class="stat-value fw-bold">—</div>
+                    </div>
                 </div>
             </div>
-            <div class="card stat-card">
-                <div class="card-body py-2 px-3 text-center">
-                    <div class="stat-label text-muted text-uppercase">Total size</div>
-                    <div id="stat-size" class="stat-value fw-bold">—</div>
-                </div>
-            </div>
-            <div class="card stat-card">
-                <div class="card-body py-2 px-3 text-center">
-                    <div class="stat-label text-muted text-uppercase">Files</div>
-                    <div id="stat-count" class="stat-value fw-bold">—</div>
-                </div>
-            </div>
+
         </div>
-
-    </div>
+    </main>
 
     <script src="vendor/echarts.min.js"></script>
     <script src="script.js"></script>
