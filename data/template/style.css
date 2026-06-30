@@ -47,7 +47,7 @@ html, body {
     flex: 1 1 0;
     min-height: 0;
     display: grid;
-    gap: 8px;
+    margin: auto 64px;
     padding: 24px 24px;
 }
 
@@ -95,10 +95,10 @@ html, body {
 
 /* ── Grid item assignments ───────────────────────────────────────────────── */
 
-#tree-panel        { grid-area: tree; overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
+#tree-panel        { grid-area: tree; overflow-y: auto; background: var(--bg); }
 #treemap-container { grid-area: treemap; min-height: 0; min-width: 0; overflow: hidden; }
 #charts-panel      { grid-area: charts; display: flex;  min-height: 0; min-width: 0; overflow: hidden; }
-#summary-panel     { grid-area: summary; display: flex; justify-content: space-between; }
+#summary-panel     { grid-area: summary; display: flex; justify-content: center; }
 
 #chart-ext,
 #chart-cat { flex: 1; min-width: 0; min-height: 0; }
@@ -148,18 +148,14 @@ html, body {
 
 /* ── Summary panel ───────────────────────────────────────────────────────── */
 
-#info-name { font-size: 15px; }
-#info-path { font-size: 11px; }
-
 .stat-card { border: 1px solid var(--border);}
-.info-card { border: 1px solid var(--border);}
 
 .stat-label {
-    font-size: 10px;
+    font-size: 16px;
     letter-spacing: 0.08em;
 }
 
-.stat-value { font-size: 18px; }
+.stat-value { font-size: 28px; }
 
 #summary-panel .card {
     width: var(--card-w);

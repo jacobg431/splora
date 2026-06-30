@@ -23,7 +23,7 @@
 
     <!-- CSS Grid layout — cells are tree-panel, treemap-container, charts-panel, summary-panel.
          The grid template changes at 1024 px; see style.css for both breakpoints. -->
-    <div id="layout">
+    <div id="layout" class="gap-4">
 
         <aside id="tree-panel" class="overflow-y-auto">
             <div id="tree-root"></div>
@@ -41,19 +41,19 @@
         <!-- ≥ 1024 px: full-width row below the top section, cards laid out horizontally.
              <  1024 px: left column below the folder tree, cards stacked vertically. -->
         <div id="summary-panel" class="bg-white py-2 gap-4">
-            <div class="card info-card w-160">
-                <div class="card-body py-2 px-3">
-                    <div id="info-name" class="fw-semibold text-truncate"></div>
-                    <div id="info-path" class="text-muted font-monospace text-truncate small mt-1"></div>
+            <div class="card stat-card">
+                <div class="card-body py-2 px-3 text-center">
+                    <div class="stat-label text-muted text-uppercase">Folder</div>
+                    <div id="stat-folder" class="stat-value fw-bold">—</div>
                 </div>
             </div>
-            <div class="card stat-card w-160">
+            <div class="card stat-card">
                 <div class="card-body py-2 px-3 text-center">
                     <div class="stat-label text-muted text-uppercase">Total size</div>
                     <div id="stat-size" class="stat-value fw-bold">—</div>
                 </div>
             </div>
-            <div class="card stat-card w-160">
+            <div class="card stat-card">
                 <div class="card-body py-2 px-3 text-center">
                     <div class="stat-label text-muted text-uppercase">Files</div>
                     <div id="stat-count" class="stat-value fw-bold">—</div>

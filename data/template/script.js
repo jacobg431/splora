@@ -141,9 +141,8 @@ function selectNode(path, source) {
 // ── Info panel ─────────────────────────────────────────────────────────────
 
 function updateInfo(node) {
-    document.getElementById('info-name').textContent  = node.name;
-    document.getElementById('info-path').textContent  = node.path;
-    document.getElementById('stat-size').textContent  = formatBytes(node.size);
+    document.getElementById('stat-folder').textContent = node.name;
+    document.getElementById('stat-size').textContent = formatBytes(node.size);
     document.getElementById('stat-count').textContent = fmtCount(node.file_count);
     updatePies(node);
 }
