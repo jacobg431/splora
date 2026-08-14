@@ -109,6 +109,8 @@ This section documents the conventions that any AI agent (regardless of model or
 | [`agent/notes.md`](agent/notes.md) | Living document of design decisions, architecture, and implementation status. |
 | [`agent/temp/`](agent/temp/) | Git-ignored scratch space for throwaway files. Safe to write freely. |
 
+**Note about Claude Code:** The [`.claude/`](.claude/) folder exists only for Claude Code's harness machinery compatibility reasons, and all its contents refers back to [`agent/`](agent/).
+
 ### Logging Requirements
 
 Every time an agent makes a change to the project — writing or editing files, running commands with side effects, or modifying configuration — it **must** append an entry to [`agent/log.md`](agent/log.md) using this format:
