@@ -135,6 +135,27 @@ Log entries must be accurate. Do not omit entries for failed attempts — record
 
 The notes file is not a log. It records *what is true now*, not *what happened*. Superseded decisions should be replaced, not appended.
 
+### Skills
+
+[`agent/skills/`](agent/skills/) holds reusable, repo-specific task instructions. Each skill is a folder named for the task, containing a single `SKILL.md`:
+
+```
+agent/skills/
+├── commit/SKILL.md
+├── pull-request/SKILL.md
+└── code-review/SKILL.md
+```
+
+Each `SKILL.md` begins with YAML frontmatter (`name` and a one-line `description`) followed by the instructions for carrying out that task in this repository. A skill defines *how a recurring workflow should be done here* — the conventions, defaults, and constraints specific to Splora — so the same task is performed consistently regardless of which agent runs it.
+
+| Skill | Purpose |
+|---|---|
+| [`commit`](agent/skills/commit/SKILL.md) | Stage and commit the current changes with a short message consistent with the repo history. Does not push. |
+| [`pull-request`](agent/skills/pull-request/SKILL.md) | Open a GitHub pull request (via `gh`) based on `main` unless told otherwise. Does not merge or close. |
+| [`code-review`](agent/skills/code-review/SKILL.md) | Assess the quality of the current branch's changes (against `main` unless told otherwise), scoped to the modified code only. |
+
+When adding a new skill, follow the same layout: a task-named folder under `agent/skills/` containing a `SKILL.md` with frontmatter and clear, self-sustaining instructions.
+
 ### General Guidelines
 
 - **Do not create files outside `agent/`** without explicit user approval. Ask first; implement after.
