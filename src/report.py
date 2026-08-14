@@ -11,7 +11,6 @@ _REPO_ROOT = Path(__file__).parent.parent
 _FS_DIR = _REPO_ROOT / "data" / "filesystem"
 _TEMPLATE_DIR = _REPO_ROOT / "data" / "template"
 _REPORT_DIR = _REPO_ROOT / "data" / "report"
-_VENDOR_DIR = _REPO_ROOT / "vendor"
 
 _REQUIRED_TEMPLATE_FILES = ("index.html", "style.css", "main.js")
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
@@ -61,26 +60,15 @@ def _read_json(path: Path) -> tuple[str, dict]:
     return raw, data
 
 
-def _missing_assets(template_dir: Path, vendor_dir: Path) -> list[str]:
-    """Return a list of asset filenames that are absent from their expected locations."""
-    missing = [f for f in _REQUIRED_TEMPLATE_FILES if not (template_dir / f).exists()]
-    if not (vendor_dir / "echarts.min.js").exists():
-        missing.append("vendor/echarts.min.js")
-    return missing
+def _missing_assets(template_dir: Path) -> list[str]:
+    """Return a list of required template files that are absent."""
+    return [f for f in _REQUIRED_TEMPLATE_FILES if not (template_dir / f).exists()]
 
 
-def _build_report(
-    out_dir: Path,
-    template_dir: Path,
-    vendor_dir: Path,
-    raw_json: str,
-) -> None:
+def _build_report(out_dir: Path, template_dir: Path, raw_json: str) -> None:
     """Create the report directory tree and write all output files."""
     out_dir.mkdir(parents=True, exist_ok=True)
     shutil.copytree(template_dir, out_dir, dirs_exist_ok=True)
-
-    (out_dir / "vendor").mkdir(exist_ok=True)
-    shutil.copy2(vendor_dir / "echarts.min.js", out_dir / "vendor" / "echarts.min.js")
     (out_dir / "data.json").write_text(raw_json, encoding="utf-8")
 
 
@@ -89,14 +77,14 @@ def report(args: argparse.Namespace) -> None:
     raw, data = _read_json(json_path)
     meta = data.get("meta", {})
 
-    missing = _missing_assets(_TEMPLATE_DIR, _VENDOR_DIR)
+    missing = _missing_assets(_TEMPLATE_DIR)
     if missing:
         print(f"Error: missing asset(s): {', '.join(missing)}", file=sys.stderr)
         sys.exit(1)
 
     out_dir = _REPORT_DIR / json_path.stem
     existed = out_dir.exists()
-    _build_report(out_dir, _TEMPLATE_DIR, _VENDOR_DIR, raw)
+    _build_report(out_dir, _TEMPLATE_DIR, raw)
 
     verb = "Updated" if existed else "Generated"
     print(f"{verb}   : {meta.get('name', json_path.stem)}")

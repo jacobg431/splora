@@ -152,52 +152,28 @@ class TestMissingAssets:
             (d / f).write_text(f"<!-- {f} -->", encoding="utf-8")
         return d
 
-    def _make_vendor_dir(self, base: Path) -> Path:
-        d = base / "vendor"
-        d.mkdir()
-        (d / "echarts.min.js").write_text("// echarts", encoding="utf-8")
-        return d
-
     def test_all_assets_present_returns_empty_list(self, tmp_path: Path):
         t = self._make_template_dir(tmp_path)
-        v = self._make_vendor_dir(tmp_path)
-        assert _missing_assets(t, v) == []
+        assert _missing_assets(t) == []
 
     def test_missing_template_file_is_reported(self, tmp_path: Path):
         t = self._make_template_dir(tmp_path)
-        v = self._make_vendor_dir(tmp_path)
         (t / "style.css").unlink()
-        missing = _missing_assets(t, v)
+        missing = _missing_assets(t)
         assert "style.css" in missing
 
     def test_all_template_files_missing_are_reported(self, tmp_path: Path):
         t = tmp_path / "empty_template"
         t.mkdir()
-        v = self._make_vendor_dir(tmp_path)
-        missing = _missing_assets(t, v)
+        missing = _missing_assets(t)
         assert set(missing) == {"index.html", "style.css", "main.js"}
-
-    def test_missing_echarts_is_reported(self, tmp_path: Path):
-        t = self._make_template_dir(tmp_path)
-        v = tmp_path / "empty_vendor"
-        v.mkdir()
-        missing = _missing_assets(t, v)
-        assert "vendor/echarts.min.js" in missing
-
-    def test_all_assets_missing_reports_all_four(self, tmp_path: Path):
-        t = tmp_path / "empty_template"
-        t.mkdir()
-        v = tmp_path / "empty_vendor"
-        v.mkdir()
-        missing = _missing_assets(t, v)
-        assert len(missing) == 4
 
 
 # ── _build_report ──────────────────────────────────────────────────────────
 
 
 class TestBuildReport:
-    def _setup_assets(self, base: Path) -> tuple[Path, Path]:
+    def _setup_template(self, base: Path) -> Path:
         template_dir = base / "template"
         template_dir.mkdir()
         for f in ("index.html", "style.css", "main.js"):
@@ -205,76 +181,62 @@ class TestBuildReport:
         # A nested module directory to exercise the recursive template copy.
         (template_dir / "core").mkdir()
         (template_dir / "core" / "widget.js").write_text("content-widget.js", encoding="utf-8")
-
-        vendor_dir = base / "vendor"
-        vendor_dir.mkdir()
-        (vendor_dir / "echarts.min.js").write_text("echarts-js", encoding="utf-8")
-
-        return template_dir, vendor_dir
+        return template_dir
 
     def test_creates_expected_files(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
+        template_dir = self._setup_template(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
 
-        _build_report(out_dir, template_dir, vendor_dir, '{"meta":{}}')
+        _build_report(out_dir, template_dir, '{"meta":{}}')
 
         assert (out_dir / "index.html").exists()
         assert (out_dir / "style.css").exists()
         assert (out_dir / "main.js").exists()
         assert (out_dir / "core" / "widget.js").exists()
         assert (out_dir / "data.json").exists()
-        assert (out_dir / "vendor" / "echarts.min.js").exists()
 
     def test_data_json_content_matches_raw_input(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
+        template_dir = self._setup_template(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
         raw = '{"meta": {"name": "test-run"}}'
 
-        _build_report(out_dir, template_dir, vendor_dir, raw)
+        _build_report(out_dir, template_dir, raw)
 
         assert (out_dir / "data.json").read_text(encoding="utf-8") == raw
 
     def test_template_content_is_copied_correctly(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
+        template_dir = self._setup_template(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
 
-        _build_report(out_dir, template_dir, vendor_dir, "{}")
+        _build_report(out_dir, template_dir, "{}")
 
         assert (out_dir / "index.html").read_text() == "content-index.html"
         assert (out_dir / "style.css").read_text() == "content-style.css"
         assert (out_dir / "main.js").read_text() == "content-main.js"
         assert (out_dir / "core" / "widget.js").read_text() == "content-widget.js"
 
-    def test_vendor_content_is_copied_correctly(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
-        out_dir = tmp_path / "report" / "my-run"
-
-        _build_report(out_dir, template_dir, vendor_dir, "{}")
-
-        assert (out_dir / "vendor" / "echarts.min.js").read_text() == "echarts-js"
-
     def test_creates_output_dir_if_missing(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
+        template_dir = self._setup_template(tmp_path)
         out_dir = tmp_path / "deeply" / "nested" / "report"
 
-        _build_report(out_dir, template_dir, vendor_dir, "{}")
+        _build_report(out_dir, template_dir, "{}")
 
         assert out_dir.is_dir()
 
     def test_idempotent_on_second_call(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
+        template_dir = self._setup_template(tmp_path)
         out_dir = tmp_path / "report"
 
-        _build_report(out_dir, template_dir, vendor_dir, '{"v":1}')
-        _build_report(out_dir, template_dir, vendor_dir, '{"v":2}')
+        _build_report(out_dir, template_dir, '{"v":1}')
+        _build_report(out_dir, template_dir, '{"v":2}')
 
         assert json.loads((out_dir / "data.json").read_text())["v"] == 2
 
     def test_no_extra_files_in_output(self, tmp_path: Path):
-        template_dir, vendor_dir = self._setup_assets(tmp_path)
+        template_dir = self._setup_template(tmp_path)
         out_dir = tmp_path / "report"
 
-        _build_report(out_dir, template_dir, vendor_dir, "{}")
+        _build_report(out_dir, template_dir, "{}")
 
         top_level = {p.name for p in out_dir.iterdir()}
-        assert top_level == {"index.html", "style.css", "main.js", "core", "data.json", "vendor"}
+        assert top_level == {"index.html", "style.css", "main.js", "core", "data.json"}
