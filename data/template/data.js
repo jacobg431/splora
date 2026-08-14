@@ -18,18 +18,6 @@ export function registerAll(node, parent) {
     node.children?.forEach(c => registerAll(c, node));
 }
 
-export function toTreemapItem(node) {
-    const item = {
-        id:     node.path,
-        name:   node.name,
-        value:  node.size || 0,
-        _path:  node.path,
-        _count: node.file_count || 0,
-    };
-    if (node.children?.length) item.children = node.children.map(toTreemapItem);
-    return item;
-}
-
 export async function loadData() {
     const res = await fetch('./data.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

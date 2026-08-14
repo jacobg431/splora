@@ -44,3 +44,69 @@ export function donutArcs(data, startAngle = -Math.PI / 2) {
         return { name: d.name, value: d.value || 0, a0, a1 };
     });
 }
+
+// Squarified treemap layout (Bruls, Huizing & van Wijk, 2000). Returns a rect
+// { item, x, y, w, h } per input item, sized proportionally to item.value.
+export function squarify(items, rect) {
+    const result = [];
+    const positive = items.filter(it => it.value > 0);
+    const total = positive.reduce((sum, it) => sum + it.value, 0);
+    if (total <= 0 || rect.w <= 0 || rect.h <= 0) return result;
+
+    const scale = (rect.w * rect.h) / total;
+    const queue = positive
+        .map(it => ({ item: it, area: it.value * scale }))
+        .sort((a, b) => b.area - a.area);
+
+    let { x, y, w, h } = rect;
+    let row = [];
+
+    for (const cell of queue) {
+        const side = Math.min(w, h);
+        if (row.length === 0 || worstRatio(row, side) >= worstRatio([...row, cell], side)) {
+            row.push(cell);
+        } else {
+            const placed = placeRow(row, x, y, w, h);
+            result.push(...placed.rects);
+            ({ x, y, w, h } = placed.remaining);
+            row = [cell];
+        }
+    }
+    if (row.length) result.push(...placeRow(row, x, y, w, h).rects);
+    return result;
+}
+
+function worstRatio(row, side) {
+    let sum = 0, max = -Infinity, min = Infinity;
+    for (const cell of row) {
+        sum += cell.area;
+        if (cell.area > max) max = cell.area;
+        if (cell.area < min) min = cell.area;
+    }
+    const sum2 = sum * sum;
+    const side2 = side * side;
+    return Math.max((side2 * max) / sum2, sum2 / (side2 * min));
+}
+
+function placeRow(row, x, y, w, h) {
+    const sum = row.reduce((acc, cell) => acc + cell.area, 0);
+    const rects = [];
+    if (w >= h) {
+        const colW = sum / h;
+        let offset = y;
+        for (const cell of row) {
+            const cellH = cell.area / colW;
+            rects.push({ item: cell.item, x, y: offset, w: colW, h: cellH });
+            offset += cellH;
+        }
+        return { rects, remaining: { x: x + colW, y, w: w - colW, h } };
+    }
+    const rowH = sum / w;
+    let offset = x;
+    for (const cell of row) {
+        const cellW = cell.area / rowH;
+        rects.push({ item: cell.item, x: offset, y, w: cellW, h: rowH });
+        offset += cellW;
+    }
+    return { rects, remaining: { x, y: y + rowH, w, h: h - rowH } };
+}

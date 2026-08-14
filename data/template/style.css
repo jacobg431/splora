@@ -253,6 +253,8 @@ button { font: inherit; }
 }
 
 #treemap-container {
+    display: flex;
+    flex-direction: column;
     height: 56vh;
     min-height: 380px;
     background: var(--surface);
@@ -261,6 +263,43 @@ button { font: inherit; }
     box-shadow: var(--shadow);
     overflow: hidden;
 }
+
+.tm-breadcrumb {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: var(--fs-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.tm-crumb {
+    max-width: 220px;
+    padding: 2px 4px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+button.tm-crumb:hover { color: var(--accent-light); background: rgba(255, 255, 255, 0.05); }
+.tm-crumb.current { color: var(--text); font-weight: 600; cursor: default; }
+.tm-sep { color: var(--faint); }
+
+.tm-canvas { flex: 1; min-height: 0; }
+.tm-canvas svg { display: block; width: 100%; height: 100%; }
+
+.tm-tile { transition: filter 0.1s ease; }
+.tm-tile:hover { filter: brightness(1.12); }
 
 #support {
     display: flex;

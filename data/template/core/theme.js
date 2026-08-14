@@ -24,10 +24,3 @@ export const SERIES = [
     '#f08a6c',
     '#8fa0b8',
 ];
-
-export const DARK_TOOLTIP = {
-    backgroundColor: 'rgba(30, 32, 48, 0.96)',
-    borderColor:     'rgba(255, 255, 255, 0.10)',
-    borderWidth:     1,
-    textStyle:       { color: COLORS.text, fontSize: 12 },
-};

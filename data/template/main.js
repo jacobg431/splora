@@ -1,10 +1,10 @@
-import { COLORS, SERIES, DARK_TOOLTIP } from './core/theme.js';
 import {
-    nodeById, formatBytes, fmtCount, registerAll, toTreemapItem, loadData,
+    nodeById, formatBytes, fmtCount, registerAll, loadData,
 } from './data.js';
 import { buildTreeItem, expandToPath, expandNode, setActive, elemById } from './ui/tree.js';
 import { initSidebar, renderMeta } from './ui/sidebar.js';
 import { Donut } from './widgets/donut.js';
+import { Treemap } from './widgets/treemap.js';
 
 let selectedPath = null;
 let treemap = null;
@@ -21,9 +21,7 @@ function selectNode(path, source) {
     if (source !== 'tree') expandToPath(path, selectNode);
     setActive(path);
 
-    if (source !== 'treemap') {
-        treemap?.dispatchAction({ type: 'treemapZoomToNode', targetNodeId: path });
-    }
+    if (source !== 'treemap') treemap?.showNode(node);
 }
 
 function updateInfo(node) {
@@ -49,66 +47,18 @@ function updateDonuts(node) {
     catDonut.setData(topEntries(node.categories, 11));
 }
 
-function treemapOption(root) {
-    return {
-        color: SERIES,
-        backgroundColor: 'transparent',
-        tooltip: {
-            formatter: p =>
-                `<b>${p.data.name}</b><br>${formatBytes(p.data.value)}<br>${fmtCount(p.data._count)} files`,
-            ...DARK_TOOLTIP,
-        },
-        series: [{
-            type: 'treemap',
-            id: 'main',
-            left: 0, right: 0, top: 0, bottom: 0,
-            roam: false,
-            nodeClick: 'zoomToNode',
-            data: [toTreemapItem(root)],
-            breadcrumb: {
-                show: true,
-                bottom: 6,
-                height: 22,
-                itemStyle: {
-                    color: COLORS.surfaceRaised,
-                    borderColor: 'transparent',
-                    textStyle: { color: COLORS.muted, fontSize: 12 },
-                },
-                emphasis: { itemStyle: { color: COLORS.accent, textStyle: { color: '#0b1020' } } },
-            },
-            upperLabel: { show: true, height: 26, fontSize: 12, color: '#fff' },
-            label:      { show: true, fontSize: 12, color: '#0b1020', formatter: '{b}' },
-            itemStyle:  { borderColor: COLORS.canvas, gapWidth: 2 },
-            levels: [
-                { itemStyle: { borderWidth: 3, gapWidth: 3, borderColor: COLORS.canvas } },
-                { itemStyle: { borderWidth: 2, gapWidth: 2, borderColor: COLORS.canvas } },
-                { itemStyle: { borderWidth: 1, gapWidth: 1, borderColor: COLORS.canvas } },
-            ],
-        }],
-    };
-}
-
 function initTreemap(root) {
-    treemap = echarts.init(document.getElementById('treemap-container'));
-    treemap.setOption(treemapOption(root));
-    treemap.on('click', params => {
-        const path = params.data?._path;
-        if (path && nodeById[path]) selectNode(path, 'treemap');
-    });
+    treemap = new Treemap(document.getElementById('treemap-container'), {
+        formatValue: formatBytes,
+        formatCount: fmtCount,
+    }).mount();
+    treemap.on('select', path => selectNode(path, 'treemap'));
+    treemap.setData(root);
 }
 
 function initCharts() {
     extDonut = new Donut(document.getElementById('chart-ext'), { title: 'Extensions', formatValue: fmtCount }).mount();
     catDonut = new Donut(document.getElementById('chart-cat'), { title: 'Categories', formatValue: fmtCount }).mount();
-}
-
-function resizeAll() {
-    treemap?.resize();
-}
-
-function wireResize() {
-    window.addEventListener('resize', resizeAll);
-    requestAnimationFrame(resizeAll);
 }
 
 async function loadReport() {
@@ -152,7 +102,6 @@ async function init() {
     initCharts();
     initTreemap(tree);
     selectNode(tree.path, 'init');
-    wireResize();
 }
 
 init();
