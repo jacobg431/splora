@@ -3,8 +3,8 @@
 :root {
     --sidebar-w:           280px;
     --sidebar-collapsed-w: 56px;
-    --charts-w: 260px;  /* width of chart column at ≥ 1024 px               */
-    --charts-h: 220px;  /* height of chart row   at <  1024 px               */
+    --charts-w: 260px;
+    --charts-h: 32vw;
     --card-h:   140px;
     --card-w:   calc(var(--card-h) * 1.618); /* golden ratio ≈ 226 px        */
     --sidebar-bg: #1e2030;
@@ -19,7 +19,7 @@
 /* ── Base ────────────────────────────────────────────────────────────────── */
 
 html, body {
-    min-height: 100vh;
+    height: 100vh;
     overflow: hidden;
     font-size: 14px;
     color: var(--text);
@@ -104,66 +104,64 @@ html, body {
 
 /* ── Layout: CSS Grid ────────────────────────────────────────────────────── */
 
-#main { min-width: 0; }
+#main { min-width: 0; overflow-y: auto; }
 
 #layout {
-    flex: 1 1 0;
-    min-height: 0;
     display: grid;
-    margin: auto 64px;
+    margin: 0 auto;
     padding: 24px 24px;
 }
 
 /*
- * ≥ 1024 px — two-column, two-row grid
+ * ≥ 1200 px — two-column, two-row grid
  *
  *  ┌──────────────────────────┬────────────┐
- *  │  treemap                 │  charts    │  1fr
+ *  │  treemap (1:1)           │  charts    │  auto (height = treemap width)
  *  ├──────────────────────────┴────────────┤
  *  │  summary (spans both columns)         │  auto
- *  └────────────────────────────────────────┘
+ *  └───────────────────────────────────────┘
  */
-@media (min-width: 1024px) {
+@media (min-width: 1200px) {
     #layout {
-        grid-template-columns: 1fr var(--charts-w);
-        grid-template-rows: 1fr auto;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
         grid-template-areas:
             "treemap charts"
             "summary summary";
     }
 
-    #charts-panel { flex-direction: column; padding: 0 16px; }
+    #charts-panel { flex-direction: column; min-height: 0; aspect-ratio: unset; }
 }
 
 /*
- * < 1024 px — single column, three rows
+ * < 1200 px — single column, three rows
  *
  *  ┌────────────────────────────────────────┐
- *  │  treemap                                │  1fr
- *  ├──────────────────────────────────────────┤
- *  │  charts (side-by-side)                  │  auto
- *  ├──────────────────────────────────────────┤
- *  │  summary                                 │  auto
- *  └────────────────────────────────────────────┘
+ *  │  treemap (1:1)                         │  auto (height = full width)
+ *  ├────────────────────────────────────────┤
+ *  │  charts (side-by-side)                 │  auto
+ *  ├────────────────────────────────────────┤
+ *  │  summary                               │  auto
+ *  └────────────────────────────────────────┘
  */
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
     #layout {
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto auto;
+        grid-template-rows: auto auto auto;
         grid-template-areas:
             "treemap"
             "charts"
             "summary";
     }
 
-    #charts-panel { flex-direction: row; min-height: var(--charts-h); }
+    #charts-panel { flex-direction: column; min-height: 0; min-width: 100%; aspect-ratio: 1; }
 }
 
 /* ── Grid item assignments ───────────────────────────────────────────────── */
 
-#treemap-container { grid-area: treemap; min-height: 0; min-width: 0; overflow: hidden; }
-#charts-panel      { grid-area: charts; display: flex;  min-height: 0; min-width: 0; overflow: hidden; }
-#summary-panel     { grid-area: summary; display: flex; justify-content: center; flex-wrap: wrap; gap: 16px; }
+#treemap-container { grid-area: treemap; aspect-ratio: 1; min-height: var(--charts-h); min-width: 0; overflow: hidden; border: 1px solid var(--border); }
+#charts-panel      { grid-area: charts; aspect-ratio: 1; display: flex; min-width: 0; overflow: hidden; border: 1px solid var(--border); }
+#summary-panel     { grid-area: summary; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 
 #chart-ext,
 #chart-cat { flex: 1; min-width: 0; min-height: 0; }
