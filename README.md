@@ -44,6 +44,22 @@ This command can be run with the following options:
 - `--exclude <pattern>` Exclude directories with this exact name. Can be repeated.
 - `--no-default-excludes` Disable the built-in default exclude list (see [`data/config/default_excludes.txt`](data/config/default_excludes.txt)).
 
+Each file is assigned exactly one category based on its extension.
+
+| Category | Example Extensions |
+|---|---|
+| Image | .jpg .jpeg .png .gif .bmp .svg .webp .ico .tiff .heic .avif .raw |
+| Video | .mp4 .avi .mkv .mov .wmv .flv .webm .m4v |
+| Audio | .mp3 .wav .flac .aac .ogg .m4a .wma |
+| Document | .pdf .doc .docx .xls .xlsx .ppt .pptx .odt .ods .odp |
+| Source Code | .py .js .ts .java .c .cpp .h .hpp .cs .go .rs .rb .php .swift .kt .sh .bat .ps1 .sql .r .lua |
+| Data | .json .csv .xml .yaml .yml .toml .db .sqlite .parquet |
+| Archive | .zip .tar .gz .bz2 .7z .rar .xz |
+| Executable | .exe .dll .so .dylib .bin .app .msi .deb .rpm |
+| Font | .ttf .otf .woff .woff2 .eot |
+| Config | .ini .cfg .conf .env .properties .editorconfig .gitignore |
+| Other | Any extension not listed above |
+
 ### Report
 
 The `report` command will generate a web-based report by using the files in [`data/template`](data/template) and the information from a JSON file. All reports are located in the [`data/report`](data/report) folder. Reports are self-contained and work offline.

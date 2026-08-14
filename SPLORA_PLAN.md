@@ -4,174 +4,20 @@ This document outlines the features that Splora must have, and the progress towa
 
 ---
 
-## MVP Features ✓
-
-All MVP features are implemented as of 2026-06-28.
-
-### CLI
-
-- `splora explore <path>` and `python splora.py explore <path>` both work (pip-installable entry point)
-- `splora report [--name]`
-- `splora boot [--name]`
-
-#### explore options
-| Option | Description |
-|---|---|
-| `--name <run-name>` | Title of the run; used as filename and report title. Defaults to root folder name. |
-| `--depth <N>` | Max subdirectory depth. `0` = unlimited (default). |
-| `--max-files <N>` | Stop traversal after visiting N files. |
-| `--timeout <seconds>` | Stop traversal after N seconds elapsed. |
-| `--exclude <pattern>` | Exclude directories matching this name. Repeatable. |
-| `--no-default-excludes` | Disable the built-in default exclude list. |
-
-#### report options
-| Option | Description |
-|---|---|
-| `--name <run-name>` | Name of the JSON file (without `.json`) under `data/filesystem/` to use. Defaults to last modified. |
-
-#### boot options
-| Option | Description |
-|---|---|
-| `--name <run-name>` | Report folder name under `data/report/` to open. Defaults to last generated. |
-
----
-
-### Explore
-
-- Traverse the filesystem from the given root path
-- Collect per-file metadata: name, size (bytes), extension, category, last modified timestamp
-- Collect per-folder aggregates: name, path, total size, file count, extension distribution, category distribution
-- Write a hierarchical JSON tree to `data/filesystem/<name>.json`
-- Respect the default exclude list at `data/config/default_excludes.txt`
-- Respect all CLI flags (`--exclude`, `--no-default-excludes`, `--depth`, `--max-files`, `--timeout`)
-- Gracefully stop on limit/timeout and mark the output JSON as partial
-
-### File Categories
-
-Each file is assigned exactly one category based on its extension.
-
-| Category | Example Extensions |
-|---|---|
-| Image | .jpg .jpeg .png .gif .bmp .svg .webp .ico .tiff .heic .avif .raw |
-| Video | .mp4 .avi .mkv .mov .wmv .flv .webm .m4v |
-| Audio | .mp3 .wav .flac .aac .ogg .m4a .wma |
-| Document | .pdf .doc .docx .xls .xlsx .ppt .pptx .odt .ods .odp |
-| Source Code | .py .js .ts .java .c .cpp .h .hpp .cs .go .rs .rb .php .swift .kt .sh .bat .ps1 .sql .r .lua |
-| Data | .json .csv .xml .yaml .yml .toml .db .sqlite .parquet |
-| Archive | .zip .tar .gz .bz2 .7z .rar .xz |
-| Executable | .exe .dll .so .dylib .bin .app .msi .deb .rpm |
-| Font | .ttf .otf .woff .woff2 .eot |
-| Config | .ini .cfg .conf .env .properties .editorconfig .gitignore |
-| Other | Any extension not listed above |
-
----
-
-### Report
-
-- Copy template files (`index.html`, `style.css`, `script.js`) from `data/template/` into `data/report/<name>/`
-- Copy `vendor/echarts.min.js` into `data/report/<name>/vendor/`
-- Write `data/report/<name>/data.json` from the corresponding `data/filesystem/<name>.json`
-- The output folder is fully self-contained: no internet connection required to view it
-
-### Frontend (Report UI)
-
-**Layout:**
-```
-┌─────────────────────────────────────────────┐
-│  [Folder Tree]  │  [Treemap]                │
-│                 │                            │
-│                 │                            │
-│                 ├────────────────────────────│
-│                 │  [Info Panel]              │
-│                 │  Name / Path / Size / Count│
-│                 │  [Ext Pie] │ [Cat Pie]     │
-└─────────────────────────────────────────────┘
-```
-
-**Treemap:**
-- Powered by ECharts (bundled, offline-capable)
-- Rectangle area proportional to folder size
-- Click a rectangle to drill down into that folder
-- Breadcrumb navigation to go back up the tree
-
-**Folder Tree (left panel):**
-- Traditional expandable folder tree
-- Bidirectional sync with the treemap: selecting a node in either panel updates the other
-
-**Info Panel (below treemap):**
-- Displays data for the currently selected folder
-- Shows: folder name, full path, total size, file count
-- Extension distribution pie chart
-- Category distribution pie chart
-
----
-
-### Boot
-
-- Find the first available TCP port starting at 5050
-- Serve `data/report/<name>/` via `http.server.SimpleHTTPRequestHandler` (suppressing per-request logs)
-- Open `http://localhost:<port>/` in the system default browser via `webbrowser.open()`
-- Serving over HTTP (rather than `file://`) avoids browser security restrictions on local JS modules
-
----
-
 ## Implemented Features
 
 | Component | Status | Notes |
 |---|---|---|
 | `splora explore` | ✓ | `os.scandir` traversal; atomic JSON write; all CLI flags; partial flag on early stop |
-| `splora report` | ✓ | Copies template + vendor assets; writes `data.json`; `--name` or last-modified fallback |
+| `splora report` | ✓ | Recursively copies the template tree; writes `data.json`; `--name` or last-modified fallback |
 | `splora boot` | ✓ | `http.server` on first free port ≥5050; `webbrowser.open()`; quiet request logging |
-| Frontend UI | ✓ | ECharts treemap with drill-down; bidirectional folder tree sync; extension + category pie charts |
+| Frontend UI | ✓ | From-scratch SVG treemap (squarified, click-to-drill + breadcrumb) and donut charts; bidirectional folder-tree sync; dark dashboard; self-contained ES modules, no vendored libs or build step |
 | pip entry point | ✓ | `splora` command available after `pip install -e .` |
 | Default excludes | ✓ | `data/config/default_excludes.txt`; overridable with `--no-default-excludes` |
-| Vendored ECharts | ✓ | `vendor/echarts.min.js` committed; copied into each report for offline use |
-| Unit tests | ✓ | 125 tests across `explore`, `report`, `boot` |
-| Integration tests | ✓ | 50 tests; monkeypatched path constants; no coupling to real `data/` directories |
+| Unit tests | ✓ | 143 tests across `explore`, `report`, `boot` (2 skipped: symlink cases need elevated Windows privileges) |
+| Integration tests | ✓ | 30 tests; monkeypatched path constants; no coupling to real `data/` directories |
 | End-to-end tests | ✓ | 24 tests; real subprocesses + daemon HTTP server; artifacts deleted on teardown |
 | GitHub CI | ✓ | PR-triggered; ubuntu + windows runners; separate steps per test tier; `ruff format --check` |
-
----
-
-## Frontend Overhaul (Active — branch: `frontend-overhaul`)
-
-Three tracks replacing the MVP UI with a polished, production-quality report experience.
-
-### Track 1: Treemap Drill-Down
-
-**Goal:** Replace the current zoom-in model with a proper nested drill-down navigation.
-
-**Current behavior:** ECharts `nodeClick: 'zoomToNode'` shrinks the treemap in-place; parent nodes remain visible as a shrunken surrounding context with a breadcrumb bar at the bottom.
-
-**Target behavior:**
-- Click a folder rectangle → treemap resets to show only that folder's direct children at 100% canvas size
-- A breadcrumb bar (top of treemap) shows the path back to root (e.g. `root / src / components`)
-- Clicking any breadcrumb segment navigates back up to that level
-- Folder tree panel stays bidirectionally synced as before
-
-**Implementation approach:** Maintain a `currentRoot` pointer in JS state. On click, update `currentRoot` and re-render the treemap with `setOption` using only that node's children as data. Build breadcrumb from `currentRoot._parent` chain. Remove ECharts' built-in breadcrumb.
-
----
-
-### Track 2: CSS Framework
-
-**Goal:** Adopt a CSS framework to unify spacing, typography, and component styles across the report. Must be vendorable (offline, no build step).
-
-**Decision: Bootstrap 5 (CSS-only).** Vendored as `vendor/bootstrap.min.css` (~30 KB gz). No Bootstrap JS needed — all interactivity is handled by ECharts and custom script.js. Copied into each report folder by `splora report` alongside ECharts.
-
----
-
-### Track 3: Dashboard Beautification
-
-**Goal:** Make the report pleasant to look at and interact with.
-
-- Cohesive color palette across treemap, pie charts, and UI chrome
-- Improved typography — font scale, weight, line-height
-- Treemap label polish — legible at all rectangle sizes, overflow handled gracefully
-- Pie chart improvements — better label placement, styled tooltips, optional legend
-- Info panel redesign — clear stat hierarchy, visual weight on key numbers
-- Hover and focus states on all interactive elements
-- Smooth transition on drill-down navigation
 
 ---
 
