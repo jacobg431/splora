@@ -13,7 +13,7 @@ _TEMPLATE_DIR = _REPO_ROOT / "data" / "template"
 _REPORT_DIR = _REPO_ROOT / "data" / "report"
 _VENDOR_DIR = _REPO_ROOT / "vendor"
 
-_TEMPLATE_FILES = ("index.html", "style.css", "script.js")
+_REQUIRED_TEMPLATE_FILES = ("index.html", "style.css", "main.js")
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 
 
@@ -63,11 +63,9 @@ def _read_json(path: Path) -> tuple[str, dict]:
 
 def _missing_assets(template_dir: Path, vendor_dir: Path) -> list[str]:
     """Return a list of asset filenames that are absent from their expected locations."""
-    missing = [f for f in _TEMPLATE_FILES if not (template_dir / f).exists()]
+    missing = [f for f in _REQUIRED_TEMPLATE_FILES if not (template_dir / f).exists()]
     if not (vendor_dir / "echarts.min.js").exists():
         missing.append("vendor/echarts.min.js")
-    if not (vendor_dir / "bootstrap.min.css").exists():
-        missing.append("vendor/bootstrap.min.css")
     return missing
 
 
@@ -79,13 +77,10 @@ def _build_report(
 ) -> None:
     """Create the report directory tree and write all output files."""
     out_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(template_dir, out_dir, dirs_exist_ok=True)
+
     (out_dir / "vendor").mkdir(exist_ok=True)
-
-    for fname in _TEMPLATE_FILES:
-        shutil.copy2(template_dir / fname, out_dir / fname)
-
     shutil.copy2(vendor_dir / "echarts.min.js", out_dir / "vendor" / "echarts.min.js")
-    shutil.copy2(vendor_dir / "bootstrap.min.css", out_dir / "vendor" / "bootstrap.min.css")
     (out_dir / "data.json").write_text(raw_json, encoding="utf-8")
 
 

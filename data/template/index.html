@@ -4,16 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Splora</title>
-    <link rel="stylesheet" href="vendor/bootstrap.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="d-flex overflow-hidden">
+<body>
 
-    <!-- Collapsible side menu. Expanded: logo + wordmark + folder tree.
-         Collapsed: logo icon only, just wide enough to stay visible. -->
-    <aside id="sidebar" class="d-flex flex-column flex-shrink-0">
-        <div id="sidebar-header" class="d-flex align-items-center">
-            <div id="sidebar-brand" class="d-flex align-items-center">
+    <aside id="sidebar">
+        <div id="sidebar-header">
+            <div id="sidebar-brand">
                 <span id="logo-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
                         <rect x="2"  y="2"  width="10" height="10" rx="1.5" fill="currentColor"/>
@@ -31,46 +28,53 @@
                 </svg>
             </button>
         </div>
-        <div id="sidebar-tree" class="overflow-y-auto">
+
+        <div id="sidebar-meta">
+            <div class="meta-name" id="meta-name">—</div>
+            <div class="meta-root" id="meta-root">—</div>
+            <span class="meta-partial hidden" id="meta-partial">Partial scan</span>
+            <div class="meta-stats">
+                <div class="meta-stat"><b id="meta-files">—</b><span>Files</span></div>
+                <div class="meta-stat"><b id="meta-size">—</b><span>Size</span></div>
+            </div>
+        </div>
+
+        <div id="sidebar-tree">
             <div id="tree-root"></div>
         </div>
     </aside>
 
-    <main id="main" class="d-flex flex-column flex-grow-1">
-        <div id="layout" class="gap-4">
+    <main id="main">
+        <div id="layout">
 
-            <div id="treemap-container"></div>
+            <section id="treemap-container" aria-label="Treemap"></section>
 
-            <div id="charts-panel" class="bg-white">
-                <div id="chart-ext"></div>
-                <div id="chart-cat"></div>
-            </div>
+            <div id="support">
+                <section id="charts-panel">
+                    <div id="chart-ext" class="chart"></div>
+                    <div id="chart-cat" class="chart"></div>
+                </section>
 
-            <div id="summary-panel" class="bg-white py-2">
-                <div class="card stat-card">
-                    <div class="card-body py-2 px-3 text-center">
-                        <div class="stat-label text-muted text-uppercase">Folder</div>
-                        <div id="stat-folder" class="stat-value fw-bold">—</div>
+                <section id="summary-panel">
+                    <div class="stat-card">
+                        <div class="stat-label">Folder</div>
+                        <div id="stat-folder" class="stat-value">—</div>
                     </div>
-                </div>
-                <div class="card stat-card">
-                    <div class="card-body py-2 px-3 text-center">
-                        <div class="stat-label text-muted text-uppercase">Total size</div>
-                        <div id="stat-size" class="stat-value fw-bold">—</div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total size</div>
+                        <div id="stat-size" class="stat-value">—</div>
                     </div>
-                </div>
-                <div class="card stat-card">
-                    <div class="card-body py-2 px-3 text-center">
-                        <div class="stat-label text-muted text-uppercase">Files</div>
-                        <div id="stat-count" class="stat-value fw-bold">—</div>
+                    <div class="stat-card">
+                        <div class="stat-label">Files</div>
+                        <div id="stat-count" class="stat-value">—</div>
                     </div>
-                </div>
+                </section>
             </div>
 
         </div>
     </main>
 
     <script src="vendor/echarts.min.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>

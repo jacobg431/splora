@@ -20,10 +20,9 @@ Three-step pipeline:
 ## Decided: Tech Stack & Design
 
 - CLI: argparse (stdlib)
-- Frontend: Pure JS + ECharts 5 (no framework, no build step)
+- Frontend: Pure JS, no framework, no build step. **Migrating off ECharts** to from-scratch SVG widgets — see "Frontend Overhaul" below. ECharts is still in the code until the treemap is replaced.
 - Report output: folder with separate assets (not single-file)
-- Treemap drill-down (click to zoom, rectangle size = folder size) + left-panel folder tree + info panel below treemap
-- Pie charts for extension distribution and category distribution
+- Folder tree in the sidebar (moved out of the content area); treemap is the report's hero element
 - V1: single run per report (no comparison)
 - Boot serves via HTTP (not `file://`) to avoid browser security restrictions on local JS
 
@@ -35,33 +34,69 @@ Three-step pipeline:
 
 ## Frontend Overhaul (branch: `frontend-overhaul`)
 
-Three tracks of active UI/UX work. No implementation has started yet; all tracks are pending decisions and green light.
+### Status of the original three tracks
 
-### Track 1: Treemap Drill-Down
+- **Track 2 (CSS framework)** — Bootstrap 5.3.3 CSS-only was vendored and wired in. *Now under review:* with the full-custom dark redesign below, Bootstrap's role shrinks to a few flex/spacing utilities. Open decision: keep it or drop it (see "Open decisions").
+- **Track 1 (treemap drill-down)** — never implemented in ECharts. It is **absorbed into the from-scratch treemap**: rendering only the children of the current level *is* the drill-down.
+- **Track 3 (beautification)** — supersedes into the design direction below.
 
-Replace `nodeClick: 'zoomToNode'` (in-place zoom) with a proper drill-down:
-- `currentRoot` JS variable tracks the visible level
-- On click → `treemap.setOption({ series: [{ data: currentRoot.children.map(toTreemapItem) }] })`
-- Manual breadcrumb built from `currentRoot._parent` chain, rendered above the treemap
-- Remove ECharts' built-in `breadcrumb` config
-- Bidirectional sync with folder tree unchanged
+### Consolidated design direction (decided 2026-08-14, via user Q&A)
 
-Key constraint: the folder tree already manages a `nodeById` map with `_parent` back-references — reuse this for breadcrumb construction.
+The light content area read as a different, blander app bolted onto the liked dark sidebar. The redesign makes everything share the sidebar's world and builds all visualizations from scratch.
 
-### Track 2: CSS Framework
+**Visual language**
+- **Full dark dashboard.** One cohesive dark surface; the sidebar stops feeling bolted-on.
+- **Elevation = lighter.** Canvas is the darkest layer, sidebar sits above it, cards are lightest:
+  - canvas `#15161f` · sidebar `#1e2030` (existing) · card `#262a3d` (hover/raised a touch lighter)
+- **Accent: cool blue** (`#6ea8fe` primary, `#93c5fd` light) — already implied by the logo and current selection color. Drives active tree row, selected treemap tile, key numbers, links, focus rings. Selection tint = `rgba(110,168,254,0.15)`.
+- **Soft cards.** Rounded corners + subtle dark-tuned shadow, **no hard borders** (kill the current 1px black borders). Optional hairline `rgba(255,255,255,0.06)` for definition only.
+- **Typography scale** needs a real ramp (current `.stat-label` 16px vs value 28px is wrong). Establish `--fs-*` tokens; labels small/uppercase/muted, values large.
 
-Decision pending. Constraints: no build step; each file must be copyable into `data/report/<name>/vendor/` for offline use.
+**Layout**
+- **Treemap is the hero**, arranged *treemap on top, supporting row below*:
+  - ≥1200px: full-width treemap hero (row 1); charts (2 donuts) + stat cards in a supporting row (row 2).
+  - <1200px: single column — treemap → charts → stats.
+  - Note: a full-width hero treemap should **not** stay locked to 1:1 (would be enormous). Give it a generous landscape height (e.g. ~55–60vh or a wide aspect). This revises the earlier 1:1 decision.
+- **Run metadata lives in the sidebar** (name / root path / total files / total size / partial badge), placed below the logo header and above the tree; hidden when the sidebar is collapsed. This finally rehouses the header metadata dropped when the sidebar landed.
 
-**Decision: Bootstrap 5 CSS-only. ✓ Implemented.**
-- `vendor/bootstrap.min.css` (Bootstrap 5.3.3, 232 KB) committed to repo
-- `report.py` copies it into `data/report/<name>/vendor/` alongside ECharts
-- `index.html` uses Bootstrap utility classes: `d-flex`, `flex-*`, `overflow-*`, `bg-white`, `border-*`, `p-3`, `text-*`, `fw-*`, `font-monospace`, `text-truncate`, `badge bg-warning`
-- `style.css` reduced to design tokens + header/tree/info-panel/chart custom rules only
-- 2 new tests added: `test_missing_bootstrap_is_reported` (unit), `test_missing_bootstrap_exits_with_code_1` (integration)
+**Visualizations: build from scratch, remove ECharts entirely**
 
-### Track 3: Dashboard Beautification
+Rationale (user): highest payoff for consistency and authenticity is to own the rendering. Graphical widgets become fully-qualified domain models.
 
-Framework (Bootstrap 5) now in place. Work includes: color palette, typography scale, treemap label handling, pie chart tooltips/legends, info panel stat cards, hover/focus states, drill-down transition animation. Not yet started.
+- **Render tech: SVG.** Each tile/segment is a real DOM element → CSS styling, `:hover`/`:focus`, accessibility, and easy drill-down transitions come for free. Node counts stay modest because the treemap only renders one level at a time.
+- **Architecture: shared `Widget` base + subclasses.** Base defines the lifecycle (`mount`/`setData`/`render`/`resize`/`destroy`) and a small event emitter (`on`/`emit`); `Treemap` and `Donut` extend it. Shared theme tokens + layout math live in helper modules.
+- **JS structure: native ES modules** via `<script type="module">` (works because `boot` serves over HTTP, not `file://`). Proposed layout under `data/template/`:
+  ```
+  index.html
+  style.css
+  main.js                 (entry, type="module")
+  core/widget.js          (base Widget + event emitter)
+  core/theme.js           (JS-side color/series palette, tokens)
+  core/svg.js             (tiny SVG element helpers)
+  core/layout.js          (squarified treemap layout; donut arc math)
+  widgets/treemap.js      (Treemap extends Widget — includes drill-down + breadcrumb)
+  widgets/donut.js        (Donut extends Widget)
+  ui/tree.js, ui/sidebar.js
+  data.js                 (fetch + registerAll + nodeById map)
+  ```
+- **Treemap layout algorithm:** squarified (Bruls et al.) for good aspect ratios. Reuse the existing `nodeById` + `_parent` back-references for breadcrumb construction.
+- **Charts:** custom SVG donuts with a curated, dark-tuned series palette (no ECharts rainbow). Top-N: extensions ~10, categories ~11 (as today).
+
+**Rollout sequence (charts first, treemap last — de-risks incrementally):**
+0. **Shell/theme foundation:** dark palette + tokens, soft-card + typography styles, treemap-hero layout, sidebar metadata, and the `Widget` base + theme/svg helpers. ECharts stays inside temporarily.
+1. **Replace the donuts** with the from-scratch `Donut` widget. Validate the widget pattern on the simpler case.
+2. **Replace the treemap** with the from-scratch `Treemap` widget, including real drill-down + manual breadcrumb (absorbs Track 1).
+3. **Drop ECharts:** remove `vendor/echarts.min.js`, update `report.py` asset copying + its tests.
+
+**`report.py` / test impact (do not forget):**
+- The asset set changes from a single `script.js` to `main.js` + module directories. `report.py` (`_missing_assets`, `_build_report`) and its unit/integration/E2E tests must be updated to copy/verify the new files.
+- `echarts.min.js` copy logic + any ECharts-related checks are removed in step 3.
+- No JS test framework is introduced (matches repo convention: Python/pytest only). Pure layout math stays untested by the suite, as `script.js` is today.
+
+### Resolved decisions
+
+- **Bootstrap: DROP it** (user, 2026-08-14). Remove `vendor/bootstrap.min.css`, replace its utility classes with our own small CSS, delete the `report.py` copy logic and the 2 bootstrap tests. Folded into step 0.
+- **First chunk: step 0 only, then review** (user, 2026-08-14). Build the dark shell + `Widget`/helper scaffolding with ECharts still inside; stop for review before touching any viz.
 
 ---
 
