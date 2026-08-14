@@ -4,9 +4,11 @@ import {
 } from './data.js';
 import { buildTreeItem, expandToPath, expandNode, setActive, elemById } from './ui/tree.js';
 import { initSidebar, renderMeta } from './ui/sidebar.js';
+import { Donut } from './widgets/donut.js';
 
 let selectedPath = null;
-let treemap = null, extChart = null, catChart = null;
+let treemap = null;
+let extDonut = null, catDonut = null;
 
 function selectNode(path, source) {
     if (selectedPath === path) return;
@@ -26,7 +28,7 @@ function selectNode(path, source) {
 
 function updateInfo(node) {
     updateStatCards(node);
-    updatePies(node);
+    updateDonuts(node);
 }
 
 function updateStatCards(node) {
@@ -42,33 +44,9 @@ function topEntries(obj, n) {
         .map(([name, value]) => ({ name: name || '(none)', value }));
 }
 
-function donutOption(title, data) {
-    return {
-        color: SERIES,
-        title: {
-            text: title,
-            left: 'center',
-            top: 8,
-            textStyle: { fontSize: 12, fontWeight: 'normal', color: COLORS.muted },
-        },
-        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', ...DARK_TOOLTIP },
-        series: [{
-            type: 'pie',
-            radius: ['42%', '66%'],
-            top: 28,
-            bottom: 8,
-            data,
-            itemStyle: { borderColor: COLORS.surface, borderWidth: 2 },
-            label: { fontSize: 11, color: COLORS.muted, formatter: '{b}\n{d}%' },
-            labelLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.20)' } },
-            emphasis: { scale: true, scaleSize: 4, label: { color: COLORS.text } },
-        }],
-    };
-}
-
-function updatePies(node) {
-    extChart.setOption(donutOption('Extensions', topEntries(node.extensions, 10)), true);
-    catChart.setOption(donutOption('Categories', topEntries(node.categories, 11)), true);
+function updateDonuts(node) {
+    extDonut.setData(topEntries(node.extensions, 10));
+    catDonut.setData(topEntries(node.categories, 11));
 }
 
 function treemapOption(root) {
@@ -120,14 +98,12 @@ function initTreemap(root) {
 }
 
 function initCharts() {
-    extChart = echarts.init(document.getElementById('chart-ext'));
-    catChart = echarts.init(document.getElementById('chart-cat'));
+    extDonut = new Donut(document.getElementById('chart-ext'), { title: 'Extensions', formatValue: fmtCount }).mount();
+    catDonut = new Donut(document.getElementById('chart-cat'), { title: 'Categories', formatValue: fmtCount }).mount();
 }
 
 function resizeAll() {
     treemap?.resize();
-    extChart?.resize();
-    catChart?.resize();
 }
 
 function wireResize() {

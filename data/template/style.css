@@ -283,6 +283,11 @@ button { font: inherit; }
 
 .chart { flex: 1; min-width: 0; height: 100%; }
 
+.donut-seg {
+    cursor: pointer;
+    transition: opacity 0.12s ease;
+}
+
 #summary-panel {
     flex: 1 1 240px;
     display: flex;

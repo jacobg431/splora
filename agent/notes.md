@@ -83,9 +83,9 @@ Rationale (user): highest payoff for consistency and authenticity is to own the 
 - **Charts:** custom SVG donuts with a curated, dark-tuned series palette (no ECharts rainbow). Top-N: extensions ~10, categories ~11 (as today).
 
 **Rollout sequence (charts first, treemap last — de-risks incrementally):**
-0. **Shell/theme foundation:** dark palette + tokens, soft-card + typography styles, treemap-hero layout, sidebar metadata, and the `Widget` base + theme/svg helpers. ECharts stays inside temporarily.
-1. **Replace the donuts** with the from-scratch `Donut` widget. Validate the widget pattern on the simpler case.
-2. **Replace the treemap** with the from-scratch `Treemap` widget, including real drill-down + manual breadcrumb (absorbs Track 1).
+0. **Shell/theme foundation** ✓ (commit ee36d28): dark palette + tokens, soft cards, typography, treemap-hero layout, sidebar metadata, `Widget` base + theme/svg helpers. ECharts still inside for the treemap + donuts.
+1. **Replace the donuts** ✓: from-scratch `widgets/donut.js` (`Donut extends Widget`) with SVG ring, on-arc labels for large slices, hover emphasis (grow + dim others), and a center readout (total by default; slice %/name/value on hover). Arc geometry in `core/layout.js` (`polarToXY`, `annularSectorPath` with full-ring special case, `donutArcs`). Donuts self-resize via the `Widget` ResizeObserver, so they are no longer in `resizeAll`. ECharts now drives only the treemap.
+2. **Replace the treemap** with the from-scratch `Treemap` widget, including real drill-down + manual breadcrumb (absorbs Track 1). Squarified layout goes in `core/layout.js` alongside the donut math.
 3. **Drop ECharts:** remove `vendor/echarts.min.js`, update `report.py` asset copying + its tests.
 
 **`report.py` / test impact (do not forget):**
