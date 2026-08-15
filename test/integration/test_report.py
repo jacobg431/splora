@@ -1,14 +1,15 @@
 """Integration tests for src/report.py.
 
 All tests call report() end-to-end. Module-level path constants (_FS_DIR,
-_TEMPLATE_DIR, _REPORT_DIR, _VENDOR_DIR) are redirected via monkeypatch so no
-real project directories are touched.
+_TEMPLATE_DIR, _REPORT_DIR) are redirected via monkeypatch so no real project
+directories are touched.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import time
 from pathlib import Path
 
@@ -52,41 +53,23 @@ def _make_fs_json(fs_dir: Path, run_name: str, *, partial: bool = False) -> Path
     return path
 
 
-def _make_assets(tmp_path: Path) -> tuple[Path, Path]:
-    """Create minimal template and vendor directories."""
-    template_dir = tmp_path / "template"
-    template_dir.mkdir()
-    for fname in ("index.html", "style.css", "script.js"):
-        (template_dir / fname).write_text(f"<!-- {fname} -->", encoding="utf-8")
-
-    vendor_dir = tmp_path / "vendor"
-    vendor_dir.mkdir()
-    (vendor_dir / "echarts.min.js").write_text("// echarts", encoding="utf-8")
-
-    return template_dir, vendor_dir
-
-
-def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path, Path]:
-    """Create all four directories and monkeypatch the module constants."""
+def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Create the directories and monkeypatch the module constants."""
     fs_dir = tmp_path / "filesystem"
     report_dir = tmp_path / "report"
     template_dir = tmp_path / "template"
-    vendor_dir = tmp_path / "vendor"
 
     fs_dir.mkdir()
     template_dir.mkdir()
-    vendor_dir.mkdir()
 
-    for fname in ("index.html", "style.css", "script.js"):
+    for fname in ("index.html", "style.css", "main.js"):
         (template_dir / fname).write_text(f"<!-- {fname} -->", encoding="utf-8")
-    (vendor_dir / "echarts.min.js").write_text("// echarts", encoding="utf-8")
 
     monkeypatch.setattr(report_mod, "_FS_DIR", fs_dir)
     monkeypatch.setattr(report_mod, "_REPORT_DIR", report_dir)
     monkeypatch.setattr(report_mod, "_TEMPLATE_DIR", template_dir)
-    monkeypatch.setattr(report_mod, "_VENDOR_DIR", vendor_dir)
 
-    return fs_dir, report_dir, template_dir, vendor_dir
+    return fs_dir, report_dir, template_dir
 
 
 # ── Tests ──────────────────────────────────────────────────────────────────
@@ -102,9 +85,8 @@ class TestReportCommand:
         out = report_dir / "my-run"
         assert (out / "index.html").exists()
         assert (out / "style.css").exists()
-        assert (out / "script.js").exists()
+        assert (out / "main.js").exists()
         assert (out / "data.json").exists()
-        assert (out / "vendor" / "echarts.min.js").exists()
 
     def test_data_json_content_matches_source(self, tmp_path: Path, monkeypatch):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
@@ -141,18 +123,9 @@ class TestReportCommand:
         assert exc.value.code == 1
 
     def test_missing_template_file_exits_with_code_1(self, tmp_path: Path, monkeypatch):
-        fs_dir, _, template_dir, _ = _patch(monkeypatch, tmp_path)
+        fs_dir, _, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         (template_dir / "style.css").unlink()
-
-        with pytest.raises(SystemExit) as exc:
-            report(_args("my-run"))
-        assert exc.value.code == 1
-
-    def test_missing_echarts_exits_with_code_1(self, tmp_path: Path, monkeypatch):
-        fs_dir, _, _, vendor_dir = _patch(monkeypatch, tmp_path)
-        _make_fs_json(fs_dir, "my-run")
-        (vendor_dir / "echarts.min.js").unlink()
 
         with pytest.raises(SystemExit) as exc:
             report(_args("my-run"))
@@ -198,4 +171,22 @@ class TestReportCommand:
         report(_args("clean-run"))
 
         top = {p.name for p in (report_dir / "clean-run").iterdir()}
-        assert top == {"index.html", "style.css", "script.js", "data.json", "vendor"}
+        assert top == {"index.html", "style.css", "main.js", "data.json"}
+
+    def test_stale_asset_removed_after_template_change(self, tmp_path: Path, monkeypatch):
+        fs_dir, report_dir, template_dir = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        (template_dir / "legacy").mkdir()
+        (template_dir / "legacy" / "old-widget.js").write_text("// old", encoding="utf-8")
+
+        report(_args("my-run"))
+        assert (report_dir / "my-run" / "legacy" / "old-widget.js").exists()
+
+        shutil.rmtree(template_dir / "legacy")
+        (template_dir / "core").mkdir()
+        (template_dir / "core" / "widget.js").write_text("// widget", encoding="utf-8")
+
+        report(_args("my-run"))
+
+        top = {p.name for p in (report_dir / "my-run").iterdir()}
+        assert top == {"index.html", "style.css", "main.js", "core", "data.json"}

@@ -44,6 +44,22 @@ This command can be run with the following options:
 - `--exclude <pattern>` Exclude directories with this exact name. Can be repeated.
 - `--no-default-excludes` Disable the built-in default exclude list (see [`data/config/default_excludes.txt`](data/config/default_excludes.txt)).
 
+Each file is assigned exactly one category based on its extension.
+
+| Category | Example Extensions |
+|---|---|
+| Image | .jpg .jpeg .png .gif .bmp .svg .webp .ico .tiff .heic .avif .raw |
+| Video | .mp4 .avi .mkv .mov .wmv .flv .webm .m4v |
+| Audio | .mp3 .wav .flac .aac .ogg .m4a .wma |
+| Document | .pdf .doc .docx .xls .xlsx .ppt .pptx .odt .ods .odp |
+| Source Code | .py .js .ts .java .c .cpp .h .hpp .cs .go .rs .rb .php .swift .kt .sh .bat .ps1 .sql .r .lua |
+| Data | .json .csv .xml .yaml .yml .toml .db .sqlite .parquet |
+| Archive | .zip .tar .gz .bz2 .7z .rar .xz |
+| Executable | .exe .dll .so .dylib .bin .app .msi .deb .rpm |
+| Font | .ttf .otf .woff .woff2 .eot |
+| Config | .ini .cfg .conf .env .properties .editorconfig .gitignore |
+| Other | Any extension not listed above |
+
 ### Report
 
 The `report` command will generate a web-based report by using the files in [`data/template`](data/template) and the information from a JSON file. All reports are located in the [`data/report`](data/report) folder. Reports are self-contained and work offline.
@@ -109,6 +125,8 @@ This section documents the conventions that any AI agent (regardless of model or
 | [`agent/notes.md`](agent/notes.md) | Living document of design decisions, architecture, and implementation status. |
 | [`agent/temp/`](agent/temp/) | Git-ignored scratch space for throwaway files. Safe to write freely. |
 
+**Note about Claude Code:** The [`.claude/`](.claude/) folder exists only for Claude Code's harness machinery compatibility reasons, and all its contents refers back to [`agent/`](agent/).
+
 ### Logging Requirements
 
 Every time an agent makes a change to the project — writing or editing files, running commands with side effects, or modifying configuration — it **must** append an entry to [`agent/log.md`](agent/log.md) using this format:
@@ -134,6 +152,27 @@ Log entries must be accurate. Do not omit entries for failed attempts — record
 - Keep it current — stale information is worse than no information.
 
 The notes file is not a log. It records *what is true now*, not *what happened*. Superseded decisions should be replaced, not appended.
+
+### Skills
+
+[`agent/skills/`](agent/skills/) holds reusable, repo-specific task instructions. Each skill is a folder named for the task, containing a single `SKILL.md`:
+
+```
+agent/skills/
+├── commit/SKILL.md
+├── pull-request/SKILL.md
+└── code-review/SKILL.md
+```
+
+Each `SKILL.md` begins with YAML frontmatter (`name` and a one-line `description`) followed by the instructions for carrying out that task in this repository. A skill defines *how a recurring workflow should be done here* — the conventions, defaults, and constraints specific to Splora — so the same task is performed consistently regardless of which agent runs it.
+
+| Skill | Purpose |
+|---|---|
+| [`commit`](agent/skills/commit/SKILL.md) | Stage and commit the current changes with a short message consistent with the repo history. Does not push. |
+| [`pull-request`](agent/skills/pull-request/SKILL.md) | Open a GitHub pull request (via `gh`) based on `main` unless told otherwise. Does not merge or close. |
+| [`code-review`](agent/skills/code-review/SKILL.md) | Assess the quality of the current branch's changes (against `main` unless told otherwise), scoped to the modified code only. |
+
+When adding a new skill, follow the same layout: a task-named folder under `agent/skills/` containing a `SKILL.md` with frontmatter and clear, self-sustaining instructions.
 
 ### General Guidelines
 

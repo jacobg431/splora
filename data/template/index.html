@@ -7,50 +7,73 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header id="header">
-        <span id="run-name">Splora</span>
-        <div id="header-meta">
-            <span id="meta-root"></span>
-            <span class="sep">·</span>
-            <span id="meta-files"></span>
-            <span class="sep">·</span>
-            <span id="meta-size"></span>
-            <span id="meta-partial" class="badge-warning hidden">Partial scan</span>
+
+    <aside id="sidebar">
+        <div id="sidebar-header">
+            <div id="sidebar-brand">
+                <span id="logo-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2"  y="2"  width="10" height="10" rx="1.5" fill="currentColor"/>
+                        <rect x="13" y="2"  width="9"  height="6"  rx="1.5" fill="currentColor" opacity="0.7"/>
+                        <rect x="13" y="9"  width="9"  height="3"  rx="1.5" fill="currentColor" opacity="0.5"/>
+                        <rect x="2"  y="13" width="20" height="9"  rx="1.5" fill="currentColor" opacity="0.35"/>
+                    </svg>
+                </span>
+                <span id="logo-text">Splora</span>
+            </div>
+            <button id="sidebar-toggle" type="button" aria-label="Collapse sidebar">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
         </div>
-    </header>
 
-    <div id="layout">
-        <aside id="tree-panel">
-            <div id="tree-root"></div>
-        </aside>
-
-        <div id="right-panel">
-            <div id="treemap-container"></div>
-
-            <div id="info-panel">
-                <div id="info-summary">
-                    <div id="info-name"></div>
-                    <div id="info-path"></div>
-                    <div id="info-stats">
-                        <div class="stat">
-                            <div class="stat-label">Total size</div>
-                            <div id="stat-size" class="stat-value">—</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-label">Files</div>
-                            <div id="stat-count" class="stat-value">—</div>
-                        </div>
-                    </div>
-                </div>
-                <div id="info-charts">
-                    <div id="chart-ext"></div>
-                    <div id="chart-cat"></div>
-                </div>
+        <div id="sidebar-meta">
+            <div class="meta-name" id="meta-name">—</div>
+            <div class="meta-root" id="meta-root">—</div>
+            <span class="meta-partial hidden" id="meta-partial">Partial scan</span>
+            <div class="meta-stats">
+                <div class="meta-stat"><b id="meta-files">—</b><span>Files</span></div>
+                <div class="meta-stat"><b id="meta-size">—</b><span>Size</span></div>
             </div>
         </div>
-    </div>
 
-    <script src="vendor/echarts.min.js"></script>
-    <script src="script.js"></script>
+        <div id="sidebar-tree">
+            <div id="tree-root"></div>
+        </div>
+    </aside>
+
+    <main id="main">
+        <div id="layout">
+
+            <section id="treemap-container" aria-label="Treemap"></section>
+
+            <div id="support">
+                <section id="charts-panel">
+                    <div id="chart-ext" class="chart"></div>
+                    <div id="chart-cat" class="chart"></div>
+                </section>
+
+                <section id="summary-panel">
+                    <div class="stat-card">
+                        <div class="stat-label">Folder</div>
+                        <div id="stat-folder" class="stat-value">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total size</div>
+                        <div id="stat-size" class="stat-value">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Files</div>
+                        <div id="stat-count" class="stat-value">—</div>
+                    </div>
+                </section>
+            </div>
+
+        </div>
+    </main>
+
+    <script type="module" src="main.js"></script>
 </body>
 </html>

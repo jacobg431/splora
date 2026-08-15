@@ -10,10 +10,14 @@ pyproject.toml covers only test/unit and test/integration).
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import urllib.error
 import urllib.request
 
 import pytest
+
+from src.report import _REPO_ROOT, _TEMPLATE_DIR
 
 
 # ── explore ────────────────────────────────────────────────────────────────
@@ -84,9 +88,8 @@ class TestReport:
 
     def test_all_required_files_are_present(self, e2e_pipeline):
         d = e2e_pipeline["report_dir"]
-        for fname in ("index.html", "style.css", "script.js", "data.json"):
+        for fname in ("index.html", "style.css", "main.js", "data.json"):
             assert (d / fname).exists(), f"Missing: {fname}"
-        assert (d / "vendor" / "echarts.min.js").exists()
 
     def test_data_json_content_matches_filesystem_json(self, e2e_pipeline):
         src = e2e_pipeline["json_path"].read_text(encoding="utf-8")
@@ -96,12 +99,33 @@ class TestReport:
     def test_index_html_references_required_assets(self, e2e_pipeline):
         html = (e2e_pipeline["report_dir"] / "index.html").read_text(encoding="utf-8")
         assert "style.css" in html
-        assert "script.js" in html
-        assert "vendor/echarts.min.js" in html
+        assert "main.js" in html
 
     def test_no_extra_files_in_report_root(self, e2e_pipeline):
+        # The report root mirrors the template tree plus the generated data.json.
         top = {p.name for p in e2e_pipeline["report_dir"].iterdir()}
-        assert top == {"index.html", "style.css", "script.js", "data.json", "vendor"}
+        template_top = {p.name for p in _TEMPLATE_DIR.iterdir()}
+        assert top == template_top | {"data.json"}
+
+    def test_regenerating_report_removes_stale_files(self, e2e_pipeline):
+        report_dir = e2e_pipeline["report_dir"]
+        stale_file = report_dir / "legacy_script.js"
+        stale_nested = report_dir / "legacy" / "old-widget.js"
+        stale_file.write_text("leftover", encoding="utf-8")
+        stale_nested.parent.mkdir()
+        stale_nested.write_text("leftover", encoding="utf-8")
+
+        subprocess.run(
+            [sys.executable, "splora.py", "report", "--name", e2e_pipeline["run_name"]],
+            cwd=_REPO_ROOT,
+            check=True,
+            capture_output=True,
+        )
+
+        assert not stale_file.exists()
+        assert not (report_dir / "legacy").exists()
+        for fname in ("index.html", "style.css", "main.js", "data.json"):
+            assert (report_dir / fname).exists()
 
 
 # ── boot ───────────────────────────────────────────────────────────────────
@@ -120,8 +144,8 @@ class TestBoot:
         resp = urllib.request.urlopen(e2e_pipeline["url"] + "style.css", timeout=5)
         assert resp.status == 200
 
-    def test_script_is_served(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"] + "script.js", timeout=5)
+    def test_main_module_is_served(self, e2e_pipeline):
+        resp = urllib.request.urlopen(e2e_pipeline["url"] + "main.js", timeout=5)
         assert resp.status == 200
 
     def test_data_json_is_served(self, e2e_pipeline):
@@ -138,8 +162,8 @@ class TestBoot:
         data = json.loads(body.decode())
         assert data["meta"]["total_files"] == 5
 
-    def test_echarts_bundle_is_served(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"] + "vendor/echarts.min.js", timeout=5)
+    def test_module_is_served(self, e2e_pipeline):
+        resp = urllib.request.urlopen(e2e_pipeline["url"] + "core/theme.js", timeout=5)
         assert resp.status == 200
         assert "javascript" in resp.headers.get("Content-Type", "")
 

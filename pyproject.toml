@@ -11,6 +11,8 @@ requires-python = ">=3.13"
 authors = [
     { name = "Jacob Gomez Hansen" },
     { name = "Claude Sonnet 4.6" },
+    { name = "Claude Sonnet 5" },
+    { name = "Claude Opus 4.8" },
 ]
 dependencies = []
 
