@@ -67,8 +67,9 @@ def _missing_assets(template_dir: Path) -> list[str]:
 
 def _build_report(out_dir: Path, template_dir: Path, raw_json: str) -> None:
     """Create the report directory tree and write all output files."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(template_dir, out_dir, dirs_exist_ok=True)
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    shutil.copytree(template_dir, out_dir)
     (out_dir / "data.json").write_text(raw_json, encoding="utf-8")
 
 

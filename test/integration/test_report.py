@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import time
 from pathlib import Path
 
@@ -171,3 +172,21 @@ class TestReportCommand:
 
         top = {p.name for p in (report_dir / "clean-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "data.json"}
+
+    def test_stale_asset_removed_after_template_change(self, tmp_path: Path, monkeypatch):
+        fs_dir, report_dir, template_dir = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        (template_dir / "legacy").mkdir()
+        (template_dir / "legacy" / "old-widget.js").write_text("// old", encoding="utf-8")
+
+        report(_args("my-run"))
+        assert (report_dir / "my-run" / "legacy" / "old-widget.js").exists()
+
+        shutil.rmtree(template_dir / "legacy")
+        (template_dir / "core").mkdir()
+        (template_dir / "core" / "widget.js").write_text("// widget", encoding="utf-8")
+
+        report(_args("my-run"))
+
+        top = {p.name for p in (report_dir / "my-run").iterdir()}
+        assert top == {"index.html", "style.css", "main.js", "core", "data.json"}

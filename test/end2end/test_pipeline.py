@@ -10,12 +10,14 @@ pyproject.toml covers only test/unit and test/integration).
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import urllib.error
 import urllib.request
 
 import pytest
 
-from src.report import _TEMPLATE_DIR
+from src.report import _REPO_ROOT, _TEMPLATE_DIR
 
 
 # ── explore ────────────────────────────────────────────────────────────────
@@ -104,6 +106,26 @@ class TestReport:
         top = {p.name for p in e2e_pipeline["report_dir"].iterdir()}
         template_top = {p.name for p in _TEMPLATE_DIR.iterdir()}
         assert top == template_top | {"data.json"}
+
+    def test_regenerating_report_removes_stale_files(self, e2e_pipeline):
+        report_dir = e2e_pipeline["report_dir"]
+        stale_file = report_dir / "legacy_script.js"
+        stale_nested = report_dir / "legacy" / "old-widget.js"
+        stale_file.write_text("leftover", encoding="utf-8")
+        stale_nested.parent.mkdir()
+        stale_nested.write_text("leftover", encoding="utf-8")
+
+        subprocess.run(
+            [sys.executable, "splora.py", "report", "--name", e2e_pipeline["run_name"]],
+            cwd=_REPO_ROOT,
+            check=True,
+            capture_output=True,
+        )
+
+        assert not stale_file.exists()
+        assert not (report_dir / "legacy").exists()
+        for fname in ("index.html", "style.css", "main.js", "data.json"):
+            assert (report_dir / fname).exists()
 
 
 # ── boot ───────────────────────────────────────────────────────────────────

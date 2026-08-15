@@ -240,3 +240,23 @@ class TestBuildReport:
 
         top_level = {p.name for p in out_dir.iterdir()}
         assert top_level == {"index.html", "style.css", "main.js", "core", "data.json"}
+
+    def test_removes_preexisting_top_level_file_not_in_template(self, tmp_path: Path):
+        template_dir = self._setup_template(tmp_path)
+        out_dir = tmp_path / "report"
+        out_dir.mkdir()
+        (out_dir / "stale.js").write_text("leftover", encoding="utf-8")
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert not (out_dir / "stale.js").exists()
+
+    def test_removes_preexisting_nested_directory_not_in_template(self, tmp_path: Path):
+        template_dir = self._setup_template(tmp_path)
+        out_dir = tmp_path / "report"
+        (out_dir / "legacy").mkdir(parents=True)
+        (out_dir / "legacy" / "old-widget.js").write_text("leftover", encoding="utf-8")
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert not (out_dir / "legacy").exists()
