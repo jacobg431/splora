@@ -42,13 +42,22 @@ this work adds a small presentation layer the commands render through.
 ### Scope
 
 **In scope:** live progress indicator during `explore`; graceful Ctrl+C across all three
-commands; copy-paste "what to do next" advice; an ASCII banner; two new global flags
-(`--trim-output`, `--no-color`); and the shared presentation layer that supports them.
+commands; copy-paste "what to do next" advice; an ASCII banner; and the shared presentation
+layer that supports them. Exactly two global flags are added, `--trim-output` and `--no-color`,
+and no others.
 
 **Out of scope:** scan logic, the output JSON schema, the frontend/report template, and the
 deferred multi-run comparison view.
 
-### New global flags (defined in `splora.py`, accepted by all three commands)
+**Existing result summaries are preserved.** Every line the three commands already print stays
+byte-identical, apart from a few non-ASCII punctuation characters that are replaced by ASCII
+equivalents. The new layer only frames those summaries — banner above, live progress during,
+advice and notices below.
+
+### New global flags
+
+Both are declared once on a shared argparse parent parser and given to every subcommand, so
+each is written after the subcommand it modifies; written before it, they are a usage error.
 
 - `--trim-output` — suppresses the banner and the next-step advice; keeps the functional
   result summary and error output. This is the clean "machine mode." **Tests default to
@@ -58,38 +67,51 @@ deferred multi-run comparison view.
 
 ### Module map & ownership
 
-New presentation code is split into three stdlib-only modules; the three command modules
-gain small responsibilities. There is intentionally **no** `interrupt.py` — the interrupt
-*mechanism* differs too much per command to share, so each command owns its own mechanism,
-while the shared *presentation* of an interrupt lives in `terminal.py`.
+New presentation code is split into small stdlib-only modules arranged in layers; the three
+command modules gain small responsibilities. There is intentionally **no** shared interrupt
+module — the interrupt *mechanism* differs too much per command to share, so each command owns
+its own mechanism, while the shared *presentation* of an interrupt lives with the terminal
+primitives.
 
-| Module | Owns |
-|---|---|
-| `splora.py` | All argparse (subparsers + the shared `--trim-output`/`--no-color` flags); builds the `OutputConfig`; maps each command to its body; invokes the terminal run-frame. Stays thin. |
-| `src/terminal.py` | The `OutputConfig` frozen dataclass (`trim`, `no_color`, derived `use_color`) + its factory; ANSI/color helpers; Windows virtual-terminal (VT) enablement; stdout/stderr stream helpers; byte + throughput formatting; the **run-frame** (banner → command body → styled advice); next-step advice styling; and the **styled interrupt-notice** helper. |
-| `src/banner.py` | A `Banner` class that renders the emblem + wordmark + version + tagline, with monochrome and trimmed fallbacks. |
-| `src/progress.py` | A `Progress` class holding running counters (file count, cumulative size, throughput), a ~10 Hz time throttle, in-place `\r` rendering and a `finish()` method. Renders **only when stderr is a TTY**. |
-| `src/explore.py` | Scan logic; `_State` stays a **pure limit-tracker**; drives `Progress` via an explicit reporter passed down the traversal, calling `.record(size)` at the same site files are counted; owns its **inline SIGINT context manager** (first press → set `stopped`, second → force); returns a next-step descriptor. |
-| `src/report.py` | Atomic build: stage the report tree in a temp sibling **under `data/report/`**, then swap into place; a `try/finally` removes the temp dir on **any** exit (normal or interrupt); catches Ctrl+C to emit a clean notice; returns a next-step descriptor. |
-| `src/boot.py` | Resolve + serve; its existing Ctrl+C handling is kept **inline** (catching `serve_forever`'s `KeyboardInterrupt`) and routed through the shared notice helper. |
+**Layering rule: a module may import only from a strictly lower layer.** In particular, no
+module is both a dependency sink and a composition root. A module holding widely-used
+primitives *and* the code that composes higher-level components will cycle as soon as one of
+those components needs the primitives — which the banner does. Keeping composition strictly
+above the primitives it consumes makes the dependency graph acyclic by construction rather
+than by inspection.
+
+| Layer | Module | Owns |
+|---|---|---|
+| 3 | `splora.py` | All argparse (subparsers plus the shared parent parser carrying the two global flags); builds the `OutputConfig`; selects the command body; hands it to the frame and exits with the code the frame returns. |
+| 2 | `src/frame.py` | The **run-frame**: banner → command body → styled next-step advice, returning the body's exit code. Renders the advice, being its only consumer. Receives the body as a callable, so it never imports a command module. |
+| 2 | `src/explore.py` | Scan logic; `_State` stays a **pure limit-tracker**; drives `Progress` via an explicit reporter passed down the traversal, calling `.record(size)` at the same site files are counted; owns its **inline SIGINT context manager** (first press → set `stopped`, second → force); returns an outcome. |
+| 2 | `src/report.py` | Atomic build: stage the report tree in a temp sibling **under `data/report/`**, then swap into place; a `try/finally` removes the temp dir on **any** exit (normal or interrupt); catches Ctrl+C to emit a clean notice; returns an outcome. |
+| 2 | `src/boot.py` | Resolve + serve; its existing Ctrl+C handling is kept **inline** (catching `serve_forever`'s `KeyboardInterrupt`) and routed through the shared notice helper; returns an outcome. |
+| 1 | `src/banner.py` | A `Banner` class that renders the emblem + wordmark + version + tagline, with monochrome and trimmed fallbacks. |
+| 1 | `src/progress.py` | A `Progress` class holding running counters (file count, cumulative size, throughput), a ~10 Hz time throttle, in-place `\r` rendering and a `finish()` method. Renders **only when stderr is a TTY**. |
+| 0 | `src/terminal.py` | The `OutputConfig` frozen dataclass (`trim`, `no_color`, derived `use_color`) + its factory; ANSI/color helpers; virtual-terminal enablement; byte + throughput formatting; and the **styled interrupt-notice** helper, shared because all three commands emit notices. Imports nothing. |
+| 0 | `src/outcome.py` | The command-result contract: the exit code a body reports plus an optional next-step descriptor. Kept apart from the presentation primitives so a command body describes its result without depending on how anything is displayed. Imports nothing. |
 
 ### Run flow (one invocation)
 
-1. `splora.py` parses args, then builds `OutputConfig` from them via a `terminal.py` factory.
-2. It calls the terminal **run-frame**, passing the chosen command body.
+1. `splora.py` parses args, then builds the `OutputConfig` from them.
+2. It calls the **frame**, passing the chosen command body as a callable.
 3. The frame prints the **banner** to stdout (skipped under `--trim-output`), then runs the body.
 4. The command **body** does its work, prints its own **result summary** to stdout, drives
-   progress/interrupt handling, and **returns a next-step descriptor** (command + run name),
-   or `None`.
+   progress/interrupt handling, and **returns an outcome**: an exit code plus an optional
+   next-step descriptor (command + run name).
 5. The frame prints the **styled next-step advice** derived from that descriptor (skipped
-   under `--trim-output`, or when the descriptor is `None` — e.g. on error/`sys.exit` or a
-   forced abort).
+   under `--trim-output`, or when there is no descriptor — e.g. after a forced abort).
+6. The frame returns the outcome's exit code and `splora.py` exits with it. Bodies report
+   ordinary outcomes by returning rather than by exiting, so that advice can still be printed
+   ahead of a non-zero code; a body that fails hard exits instead, which passes through the
+   frame untouched and correctly suppresses the advice.
 
 ### Feature specs
 
 **1. Live progress (`explore`)** — a single line updated in place on **stderr** via carriage
-return, throttled to ~10 Hz. Shows: files scanned · elapsed · cumulative size · throughput
-(files/sec). It is **not** shown when stderr is not a TTY (pipes, CI, redirects), keeping
+return, throttled to ~10 Hz. Shows files scanned, elapsed time, cumulative size, and
+throughput. It is **not** shown when stderr is not a TTY (pipes, CI, redirects), keeping
 stdout clean and machine output unpolluted.
 
 **2. Graceful interrupt + unified notices** — a single styled notice helper in `terminal.py`
@@ -109,11 +131,33 @@ after `report` → `splora boot --name <name>`. Supplied by the command as a des
 styled uniformly by the frame; suppressed by `--trim-output`.
 
 **4. ASCII banner** — an "emblem + wordmark" banner printed once per run at the top, on
-stdout, colored (mono fallback), suppressed by `--trim-output`. The emblem is an ASCII
-rendering of the existing SVG logo (a treemap of four blocks at descending opacities), mapped
-to the Unicode shade blocks `█ ▓ ▒ ░`. It sits beside a figlet-style `SPLORA` wordmark, with a
-tagline and the package version beneath. Exact art, tagline text, colors, and the version
-source (`importlib.metadata` with a static fallback) are finalized during implementation.
+stdout, colored with a monochrome fallback, suppressed by `--trim-output`. The emblem is an
+ASCII rendering of the existing SVG logo — a treemap of four blocks at descending opacities —
+mapped onto a four-step density ramp, so the tiers stay distinguishable when color is off and
+shape alone has to carry the depth. It sits beside a figlet-style wordmark, with the tagline
+and the package version beneath. The version is read from installed package metadata, falling
+back to a static value when the package is not installed.
+
+```
+  ##### %%%%%    ____   ____   _      ___   ____      _
+  ##### %%%%%   / ___| |  _ \ | |    / _ \ |  _ \    / \
+  ##### +++++   \___ \ | |_) || |    | | | || |_) |  / _ \
+  ..........     ___) ||  __/ | |___ | |_| ||  _ <  / ___ \
+  ..........    |____/ |_|    |_____| \___/ |_| \_\/_/   \_\
+
+  see where your disk went  -  v0.1.0
+```
+
+The tagline is adopted in `README.md` as well, so the terminal and the documentation open with
+the same line.
+
+**5. All printed output is ASCII** — no byte the tool prints falls outside ASCII, which removes
+the need for any encoding-fallback path. When output is redirected to a file, Python encodes it
+with the locale encoding rather than UTF-8; on Windows that is a legacy codepage unable to
+represent typographic punctuation, so a single such character turns a redirected run into an
+encoding error. A few characters already in the codebase carry this fault — an ellipsis and
+three dashes, all inside printed strings — and are replaced by ASCII equivalents. Box-drawing
+characters used in source comments are never printed and are unaffected.
 
 ### Exit-code convention
 
@@ -132,18 +176,55 @@ deliberately avoided for "partial" because argparse already uses exit `2` for us
 
 Follows the existing tiering, with one rule: **any test that performs filesystem I/O and is
 not a full end-to-end test counts as an integration test** (unit tests stay pure). Interrupt
-behavior is covered end-to-end.
+behavior is covered at both the integration and end-to-end tiers.
 
 - **Unit** (pure, no I/O): byte + throughput formatting; the progress throttle decision; the
   `Banner` string; color gating from `--no-color`; the advice string; `OutputConfig`
   derivation; the frame's trim-gating; the interrupt-notice string.
 - **Integration** (filesystem I/O, path constants monkeypatched): `report`'s atomic build and
   temp-dir cleanup on both normal exit and simulated failure; `--trim-output` output shape;
-  the partial exit code (`3`).
-- **End-to-end** (real subprocesses): send a real SIGINT to a live `explore` and assert the
+  the partial exit code (`3`); and interrupt handling exercised by invoking the installed
+  handler directly, which delivers no signal and therefore runs on every platform.
+- **End-to-end** (real subprocesses): send a real interrupt to a live `explore` and assert the
   1st press writes+flags partial output (exit `3`) and the 2nd aborts (exit `130`); `report`
-  cancel (exit `130`); `boot` stop (exit `0`); and that `--trim-output` yields clean stdout.
-  (Delivering SIGINT on Windows is platform-fiddly and is the known-risky test.)
+  cancel (exit `130`); and that `--trim-output` yields clean stdout while the result summary
+  survives it.
+
+  The end-to-end interrupt tests run on **POSIX only**. Delivering an interrupt to a child
+  process on Windows needs a different signal and a dedicated process group, and would oblige
+  the production code to handle a signal it otherwise never sees — code existing solely to make
+  a test reachable. Windows keeps its interrupt coverage at the integration tier instead.
+
+### Lessons from a superseded version of this plan
+
+An earlier version of this plan grouped the presentation code differently, and an
+implementation attempt against it failed. The layering rule above exists to prevent a repeat,
+so the failure is recorded here rather than left to be rediscovered.
+
+**What failed.** The banner and the module holding the shared terminal primitives became
+mutually dependent: the run-frame needed the banner in order to print it, while the banner
+needed the primitives in order to style itself. With imports in conventional position this
+fails in **both** directions with a partially-initialized-module error. Moving one import below
+the definitions it depends on makes the failure disappear in one direction only — an
+order-dependent break, which is worse than an outright one, because it survives until some
+unrelated import order changes.
+
+**Root cause.** A single module had been given both the widely-used primitives and the
+composition that consumes higher-level components. Such a module is simultaneously the bottom
+and the top of the dependency graph, and cycles as soon as an intermediate component needs the
+primitives. The fault lay in the grouping rather than in any code written against it, which is
+why the correction is a layering rule and not a local workaround.
+
+**A second defect from the same cause.** The command-result contract had also been placed among
+the presentation primitives, so every command module would have depended on presentation purely
+to describe its own return value. Both defects are one failure of cohesion: a single module
+accumulating responsibilities from opposite ends of the graph.
+
+**A deferred import does not fix a cycle.** The attempt worked around the cycle with a
+function-local import instead of reporting it. Deferring an import is a reasonable tool for
+genuinely optional or expensive dependencies; used against a cycle caused by mislayered
+responsibilities it merely hides a design fault behind code that appears to work. An import
+that has to be moved inside a function is a signal that the layering is wrong.
 
 ---
 
