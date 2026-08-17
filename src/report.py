@@ -29,10 +29,7 @@ def _latest_json(fs_dir: Path) -> Path | None:
 
 
 def _resolve_json_path(name: str | None, fs_dir: Path) -> Path:
-    """Return the source JSON Path for a given run name (or the latest if None).
-
-    Exits with code 1 if the file cannot be found.
-    """
+    """Return the source JSON path for a run name, or the latest when none is given."""
     if name:
         path = fs_dir / f"{_sanitize(name)}.json"
         if not path.exists():
@@ -47,10 +44,7 @@ def _resolve_json_path(name: str | None, fs_dir: Path) -> Path:
 
 
 def _read_json(path: Path) -> tuple[str, dict]:
-    """Read and parse a JSON file; return (raw_text, parsed_dict).
-
-    Exits with code 1 on I/O or parse errors.
-    """
+    """Return a JSON file's raw text alongside its parsed content."""
     try:
         raw = path.read_text(encoding="utf-8")
         data = json.loads(raw)
@@ -74,6 +68,7 @@ def _build_report(out_dir: Path, template_dir: Path, raw_json: str) -> None:
 
 
 def report(args: argparse.Namespace) -> None:
+    """Generate an HTML report from a recorded exploration run."""
     json_path = _resolve_json_path(args.name, _FS_DIR)
     raw, data = _read_json(json_path)
     meta = data.get("meta", {})

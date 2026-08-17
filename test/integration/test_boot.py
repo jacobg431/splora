@@ -38,6 +38,8 @@ def _patch(monkeypatch, tmp_path: Path) -> Path:
 
 
 class TestBootCommand:
+    """The boot command resolving a report and starting the server."""
+
     def test_calls_serve_with_correct_directory_and_port(self, tmp_path: Path, monkeypatch):
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
@@ -105,6 +107,8 @@ class TestBootCommand:
 
 
 class TestHttpServing:
+    """Responses served over HTTP from a report directory."""
+
     def test_serve_returns_http_200_for_index(self, tmp_path: Path):
         (tmp_path / "index.html").write_text("<h1>Splora</h1>", encoding="utf-8")
 

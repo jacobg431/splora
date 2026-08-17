@@ -23,6 +23,8 @@ from src.report import _REPO_ROOT, _TEMPLATE_DIR
 
 
 class TestExplore:
+    """The explore stage of a full pipeline run."""
+
     def test_json_file_is_created(self, e2e_pipeline):
         assert e2e_pipeline["json_path"].exists()
 
@@ -82,6 +84,8 @@ class TestExplore:
 
 
 class TestReport:
+    """The report stage of a full pipeline run."""
+
     def test_report_directory_exists(self, e2e_pipeline):
         assert e2e_pipeline["report_dir"].is_dir()
 
@@ -131,6 +135,8 @@ class TestReport:
 
 
 class TestBoot:
+    """The boot stage of a full pipeline run."""
+
     def test_server_responds_with_200(self, e2e_pipeline):
         resp = urllib.request.urlopen(e2e_pipeline["url"], timeout=5)
         assert resp.status == 200

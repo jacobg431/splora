@@ -40,6 +40,8 @@ def _load(out_dir: Path, name: str) -> dict:
 
 
 class TestExploreCommand:
+    """The explore command traversing a tree and writing its JSON."""
+
     def test_generates_valid_json_with_correct_structure(self, tmp_path: Path, monkeypatch):
         # Keep scan_dir and out_dir as siblings so out_dir is never included in the scan.
         scan_dir = tmp_path / "scan"

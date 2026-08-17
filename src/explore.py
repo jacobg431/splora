@@ -157,6 +157,8 @@ def _fmt_bytes(n: float) -> str:
 
 @dataclass
 class _State:
+    """Traversal limits and the visit count that decide when a scan stops."""
+
     files_visited: int = 0
     max_files: int | None = None
     deadline: float | None = None
@@ -284,6 +286,7 @@ def _build_state(args: argparse.Namespace) -> _State:
 
 
 def explore(args: argparse.Namespace) -> None:
+    """Traverse a file system and record its structure as JSON."""
     root = Path(args.path).resolve()
 
     if not root.exists():

@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
+      - name: Lint tests
+        run: pytest test/lint/
+
       - name: Unit tests
         run: pytest test/unit/
 

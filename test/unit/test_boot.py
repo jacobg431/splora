@@ -20,6 +20,8 @@ from src.boot import (
 
 
 class TestSanitize:
+    """Name sanitization applied before a report directory lookup."""
+
     def test_valid_name_unchanged(self):
         assert _sanitize("my-run_v2") == "my-run_v2"
 
@@ -43,6 +45,8 @@ class TestSanitize:
 
 
 class TestLatestReport:
+    """Selection of the most recently modified report directory."""
+
     def test_nonexistent_report_dir_returns_none(self, tmp_path: Path):
         assert _latest_report(tmp_path / "does-not-exist") is None
 
@@ -77,6 +81,8 @@ class TestLatestReport:
 
 
 class TestResolveReportDir:
+    """Resolution of a report directory by name or by recency."""
+
     def test_named_dir_that_exists_is_returned(self, tmp_path: Path):
         (tmp_path / "my-run").mkdir()
         assert _resolve_report_dir("my-run", tmp_path) == tmp_path / "my-run"
@@ -117,6 +123,8 @@ class TestResolveReportDir:
 
 
 class TestFindFreePort:
+    """Selection of the first available port within the scan range."""
+
     def _mock_socket(self, bind_side_effect=None):
         """Return a mock socket context manager."""
         s = MagicMock()
@@ -157,6 +165,8 @@ class TestFindFreePort:
 
 
 class TestServe:
+    """Server startup, browser launch, and interrupt handling."""
+
     def _make_httpd_mock(self):
         """Build a mock HTTPServer that raises KeyboardInterrupt on serve_forever."""
         httpd = MagicMock()

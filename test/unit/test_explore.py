@@ -30,6 +30,8 @@ from src.explore import (
 
 
 class TestSanitize:
+    """Name sanitization applied to run names and output filenames."""
+
     def test_valid_name_is_unchanged(self):
         assert _sanitize("my-project_v2") == "my-project_v2"
 
@@ -66,6 +68,8 @@ class TestSanitize:
 
 
 class TestFmtBytes:
+    """Human-readable byte formatting across every unit boundary."""
+
     def test_zero(self):
         assert _fmt_bytes(0) == "0 B"
 
@@ -99,6 +103,8 @@ class TestFmtBytes:
 
 
 class TestCategories:
+    """Integrity of the extension-to-category mapping."""
+
     @pytest.mark.parametrize(
         "ext,expected",
         [
@@ -164,6 +170,8 @@ class TestCategories:
 
 
 class TestState:
+    """Limit tracking that decides when a traversal stops."""
+
     def test_initial_state_is_not_stopped(self):
         assert not _State().stopped
         assert not _State().check()
@@ -213,6 +221,8 @@ class TestState:
 
 
 class TestResolveName:
+    """Run-name resolution from arguments or the root directory."""
+
     def _args(self, name: str | None = None) -> argparse.Namespace:
         return argparse.Namespace(name=name)
 
@@ -234,6 +244,8 @@ class TestResolveName:
 
 
 class TestBuildExcludes:
+    """Merging of user-supplied excludes with the built-in defaults."""
+
     def _args(
         self, exclude: list[str] | None = None, no_default_excludes: bool = False
     ) -> argparse.Namespace:
@@ -274,6 +286,8 @@ class TestBuildExcludes:
 
 
 class TestBuildState:
+    """Construction of traversal state from the command-line limits."""
+
     def _args(
         self, max_files: int | None = None, timeout: float | None = None
     ) -> argparse.Namespace:
@@ -305,6 +319,8 @@ class TestBuildState:
 
 
 class TestScanDir:
+    """Recursive directory scanning and aggregation of child statistics."""
+
     def test_empty_directory_returns_zero_counts(self, tmp_path: Path):
         node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
         assert node["file_count"] == 0

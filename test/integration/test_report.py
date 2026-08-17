@@ -75,6 +75,8 @@ def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path]:
 
 
 class TestReportCommand:
+    """The report command turning a recorded run into a report folder."""
+
     def test_generates_complete_report_folder(self, tmp_path: Path, monkeypatch):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")

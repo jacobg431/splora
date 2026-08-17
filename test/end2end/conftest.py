@@ -38,6 +38,7 @@ def _build_scan_tree(root: Path) -> None:
 
 @pytest.fixture(scope="session")
 def e2e_pipeline(tmp_path_factory):
+    """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)
 

@@ -21,6 +21,8 @@ from src.report import (
 
 
 class TestSanitize:
+    """Name sanitization applied before locating a recorded run."""
+
     def test_valid_name_unchanged(self):
         assert _sanitize("my-run_v2") == "my-run_v2"
 
@@ -44,6 +46,8 @@ class TestSanitize:
 
 
 class TestLatestJson:
+    """Selection of the most recently modified filesystem JSON."""
+
     def test_empty_directory_returns_none(self, tmp_path: Path):
         assert _latest_json(tmp_path) is None
 
@@ -75,6 +79,8 @@ class TestLatestJson:
 
 
 class TestResolveJsonPath:
+    """Resolution of a source JSON file by name or by recency."""
+
     def test_named_file_that_exists_is_returned(self, tmp_path: Path):
         f = tmp_path / "my-run.json"
         f.write_text("{}", encoding="utf-8")
@@ -108,6 +114,8 @@ class TestResolveJsonPath:
 
 
 class TestReadJson:
+    """Reading and parsing of a recorded run's JSON file."""
+
     def test_valid_json_returns_raw_and_dict(self, tmp_path: Path):
         payload = {"meta": {"name": "test"}, "tree": {}}
         f = tmp_path / "data.json"
@@ -144,6 +152,8 @@ class TestReadJson:
 
 
 class TestMissingAssets:
+    """Detection of template files absent from the asset directory."""
+
     def _make_template_dir(self, base: Path) -> Path:
         d = base / "template"
         d.mkdir()
@@ -172,6 +182,8 @@ class TestMissingAssets:
 
 
 class TestBuildReport:
+    """Construction of a report directory from the template tree."""
+
     def _setup_template(self, base: Path) -> Path:
         template_dir = base / "template"
         template_dir.mkdir()
