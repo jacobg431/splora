@@ -17,15 +17,14 @@ import pytest
 import src.explore as explore_mod
 from src.explore import (
     CATEGORIES,
-    _State,
     _build_excludes,
     _build_state,
     _fmt_bytes,
     _resolve_name,
     _sanitize,
     _scan_dir,
+    _State,
 )
-
 
 # ── _sanitize ──────────────────────────────────────────────────────────────
 

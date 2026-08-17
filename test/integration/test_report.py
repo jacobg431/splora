@@ -18,7 +18,6 @@ import pytest
 import src.report as report_mod
 from src.report import report
 
-
 # ── Shared helpers ─────────────────────────────────────────────────────────
 
 

@@ -31,6 +31,23 @@ jobs:
       - name: End-to-end tests
         run: pytest test/end2end/
 
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Check linting
+        run: ruff check .
+
   format:
     name: Formatting
     runs-on: ubuntu-latest

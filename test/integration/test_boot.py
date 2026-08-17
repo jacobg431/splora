@@ -8,8 +8,8 @@ to verify that files are actually served over the network.
 from __future__ import annotations
 
 import argparse
-import time
 import threading
+import time
 import urllib.request
 from pathlib import Path
 from unittest.mock import patch
@@ -18,7 +18,6 @@ import pytest
 
 import src.boot as boot_mod
 from src.boot import _find_free_port, _serve, boot
-
 
 # ── Shared helpers ─────────────────────────────────────────────────────────
 

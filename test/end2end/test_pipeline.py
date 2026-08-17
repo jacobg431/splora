@@ -19,7 +19,6 @@ import pytest
 
 from src.report import _REPO_ROOT, _TEMPLATE_DIR
 
-
 # ── explore ────────────────────────────────────────────────────────────────
 
 

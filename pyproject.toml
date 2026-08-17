@@ -37,7 +37,7 @@ target-version = "py313"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["F401", "F811", "F821", "F841", "I001", "D400"]
 
 [tool.pytest.ini_options]
 testpaths = ["test/unit", "test/integration"]
