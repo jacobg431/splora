@@ -85,12 +85,14 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Tests live under [`test/`](test/), split into two folders:
+Tests live under [`test/`](test/), split into four folders:
 
 | Folder | Scope |
 |---|---|
-| `test/unit/` | Individual functions tested in isolation; uses `tmp_path` for any filesystem interaction |
-| `test/integration/` | Full `explore()` command run end-to-end against temporary directory trees |
+| [`test/lint/`](test/lint/) | Project rules checked by parsing the source; no behaviour is run |
+| [`test/unit/`](test/unit/) | Individual functions in isolation, with no filesystem or process I/O |
+| [`test/integration/`](test/integration/) | Whole commands driven in-process against temporary trees |
+| [`test/end2end/`](test/end2end/) | The full pipeline driven as real subprocesses |
 
 Useful flags:
 
@@ -113,74 +115,6 @@ The suite invokes `explore` and `report` as real subprocesses, starts the HTTP s
 
 ## For Code Agents
 
-This section documents the conventions that any AI agent (regardless of model or provider) must follow when working on this project.
+The conventions that any AI agent — regardless of model or provider — must follow when working on this project live in [`agent/conventions.md`](agent/conventions.md). They cover the [`agent/`](agent/) workspace and its logging and notes requirements, the skills, the code style, and the test tiers. Read that file before making changes.
 
-### The `agent/` Folder
-
-[`agent/`](agent/) is the agent's dedicated workspace. It contains two required files and one scratch area:
-
-| Path | Purpose |
-|---|---|
-| [`agent/log.md`](agent/log.md) | Append-only activity log. One line per entry. |
-| [`agent/notes.md`](agent/notes.md) | Living document of design decisions, architecture, and implementation status. |
-| [`agent/temp/`](agent/temp/) | Git-ignored scratch space for throwaway files. Safe to write freely. |
-
-**Note about Claude Code:** The [`.claude/`](.claude/) folder exists only for Claude Code's harness machinery compatibility reasons, and all its contents refers back to [`agent/`](agent/).
-
-### Logging Requirements
-
-Every time an agent makes a change to the project — writing or editing files, running commands with side effects, or modifying configuration — it **must** append an entry to [`agent/log.md`](agent/log.md) using this format:
-
-```
-[YYYY-MM-DD] <intent> | <action taken> | <outcome>
-```
-
-Examples:
-```
-[2026-06-28] Implement explore.py | Wrote src/explore.py with os.scandir traversal | Smoke tests passed
-[2026-06-28] Fix pytest tmp cleanup on Windows | Added tmp_path_retention_policy = "none" to pyproject.toml | Confirmed by user: PermissionError resolved
-```
-
-Log entries must be accurate. Do not omit entries for failed attempts — record what was tried and what went wrong.
-
-### Notes Requirements
-
-[`agent/notes.md`](agent/notes.md) is the agent's memory of decisions that are not obvious from the code itself. The agent **must**:
-
-- Read `agent/notes.md` at the start of each session to restore context.
-- Update it whenever a design decision is made, a constraint is discovered, or the implementation status of a module changes.
-- Keep it current — stale information is worse than no information.
-
-The notes file is not a log. It records *what is true now*, not *what happened*. Superseded decisions should be replaced, not appended.
-
-### Skills
-
-[`agent/skills/`](agent/skills/) holds reusable, repo-specific task instructions. Each skill is a folder named for the task, containing a single `SKILL.md`:
-
-```
-agent/skills/
-├── commit/SKILL.md
-├── pull-request/SKILL.md
-└── code-review/SKILL.md
-```
-
-Each `SKILL.md` begins with YAML frontmatter (`name` and a one-line `description`) followed by the instructions for carrying out that task in this repository. A skill defines *how a recurring workflow should be done here* — the conventions, defaults, and constraints specific to Splora — so the same task is performed consistently regardless of which agent runs it.
-
-| Skill | Purpose |
-|---|---|
-| [`commit`](agent/skills/commit/SKILL.md) | Stage and commit the current changes with a short message consistent with the repo history. Does not push. |
-| [`pull-request`](agent/skills/pull-request/SKILL.md) | Open a GitHub pull request (via `gh`) based on `main` unless told otherwise. Does not merge or close. |
-| [`code-review`](agent/skills/code-review/SKILL.md) | Assess the quality of the current branch's changes (against `main` unless told otherwise), scoped to the modified code only. |
-
-When adding a new skill, follow the same layout: a task-named folder under `agent/skills/` containing a `SKILL.md` with frontmatter and clear, self-sustaining instructions.
-
-### General Guidelines
-
-- **Do not create files outside `agent/`** without explicit user approval. Ask first; implement after.
-- **Do not modify `agent/log.md` retroactively.** Entries are append-only.
-- **Prefer the existing test conventions** (`pytest`, `tmp_path`, `monkeypatch`) over introducing new testing frameworks.
-- **Prefer stdlib** over third-party dependencies. If a new dependency is necessary, discuss it with the user before adding it to `pyproject.toml`.
-- **Do not open browsers, send network requests, or modify files outside the repository** without explicit instruction.
-- **Keep the test suite green.** Run `pytest` before reporting a task as complete. If tests fail and you cannot fix them, say so explicitly.
-- **Always add a log entry** when making a change to the repo before reporting a task as complete.
-- **Python version is 3.13.** Do not use syntax or APIs that require a newer version or that were removed in 3.13.
+The [`.claude/`](.claude/) folder exists only for Claude Code's harness machinery compatibility reasons, and all its contents refers back to [`agent/`](agent/).
