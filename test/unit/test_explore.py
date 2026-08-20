@@ -207,18 +207,14 @@ class TestResolveName:
     def _args(self, name: str | None = None) -> argparse.Namespace:
         return argparse.Namespace(name=name)
 
-    def test_explicit_name_takes_precedence(self, tmp_path: Path):
-        assert _resolve_name(self._args("my-run"), tmp_path) == "my-run"
+    def test_explicit_name_takes_precedence(self):
+        assert _resolve_name(self._args("my-run"), Path("/data/projects")) == "my-run"
 
-    def test_falls_back_to_root_directory_name(self, tmp_path: Path):
-        subdir = tmp_path / "my-folder"
-        subdir.mkdir()
-        assert _resolve_name(self._args(), subdir) == "my-folder"
+    def test_falls_back_to_root_directory_name(self):
+        assert _resolve_name(self._args(), Path("/data/my-folder")) == "my-folder"
 
-    def test_explicit_name_wins_even_when_root_has_a_name(self, tmp_path: Path):
-        subdir = tmp_path / "some-dir"
-        subdir.mkdir()
-        assert _resolve_name(self._args("override"), subdir) == "override"
+    def test_explicit_name_wins_even_when_root_has_a_name(self):
+        assert _resolve_name(self._args("override"), Path("/data/some-dir")) == "override"
 
 
 class TestBuildExcludes:
@@ -293,9 +289,11 @@ class TestBuildState:
 class TestScanDir:
     """Recursive directory scanning when the directory cannot be listed."""
 
-    def test_permission_error_returns_empty_node(self, tmp_path: Path):
+    def test_permission_error_returns_empty_node(self):
         # Simulate a directory that cannot be listed
         with patch("os.scandir", side_effect=PermissionError("denied")):
-            node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+            node = _scan_dir(
+                Path("/unreadable"), depth=0, depth_limit=0, excludes=set(), state=_State()
+            )
         assert node["file_count"] == 0
         assert node["children"] == []

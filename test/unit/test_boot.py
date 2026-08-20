@@ -9,6 +9,8 @@ import pytest
 
 from src.boot import _find_free_port, _sanitize, _serve
 
+_SERVED_DIR = Path("/reports/my-run")
+
 
 class TestSanitize:
     """Name sanitization applied before a report directory lookup."""
@@ -82,44 +84,44 @@ class TestServe:
         httpd.serve_forever.side_effect = KeyboardInterrupt
         return httpd
 
-    def test_opens_browser_when_open_browser_is_true(self, tmp_path: Path):
+    def test_opens_browser_when_open_browser_is_true(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(tmp_path, 5050, open_browser=True)
+                _serve(_SERVED_DIR, 5050, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:5050/")
 
-    def test_does_not_open_browser_when_open_browser_is_false(self, tmp_path: Path):
+    def test_does_not_open_browser_when_open_browser_is_false(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(tmp_path, 5050, open_browser=False)
+                _serve(_SERVED_DIR, 5050, open_browser=False)
         mock_open.assert_not_called()
 
-    def test_binds_to_localhost_on_given_port(self, tmp_path: Path):
+    def test_binds_to_localhost_on_given_port(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd) as MockServer:
             with patch("src.boot.webbrowser.open"):
-                _serve(tmp_path, 8080, open_browser=False)
+                _serve(_SERVED_DIR, 8080, open_browser=False)
         MockServer.assert_called_once_with(("127.0.0.1", 8080), MockServer.call_args[0][1])
 
-    def test_serve_forever_is_called(self, tmp_path: Path):
+    def test_serve_forever_is_called(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open"):
-                _serve(tmp_path, 5050, open_browser=False)
+                _serve(_SERVED_DIR, 5050, open_browser=False)
         httpd.serve_forever.assert_called_once()
 
-    def test_keyboard_interrupt_is_handled_gracefully(self, tmp_path: Path):
+    def test_keyboard_interrupt_is_handled_gracefully(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open"):
                 # Should NOT propagate KeyboardInterrupt to the caller
-                _serve(tmp_path, 5050, open_browser=False)
+                _serve(_SERVED_DIR, 5050, open_browser=False)
 
-    def test_url_is_constructed_from_port(self, tmp_path: Path):
+    def test_url_is_constructed_from_port(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(tmp_path, 9999, open_browser=True)
+                _serve(_SERVED_DIR, 9999, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:9999/")
