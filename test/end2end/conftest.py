@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -37,36 +38,29 @@ def _build_scan_tree(root: Path) -> None:
 
 
 @pytest.fixture(scope="session")
-def e2e_pipeline(tmp_path_factory):
+def run_cli() -> Callable[..., None]:
+    """Return a helper that runs the splora CLI as a real subprocess."""
+
+    def run(*args: str) -> None:
+        subprocess.run(
+            [sys.executable, "splora.py", *args],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+        )
+
+    return run
+
+
+@pytest.fixture(scope="session")
+def e2e_pipeline(tmp_path_factory, run_cli):
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)
 
-    # ── explore ────────────────────────────────────────────────────────────
-    subprocess.run(
-        [
-            sys.executable,
-            "splora.py",
-            "explore",
-            str(scan_root),
-            "--name",
-            RUN_NAME,
-            "--no-default-excludes",
-        ],
-        cwd=PROJECT_ROOT,
-        check=True,
-        capture_output=True,
-    )
+    run_cli("explore", str(scan_root), "--name", RUN_NAME, "--no-default-excludes")
+    run_cli("report", "--name", RUN_NAME)
 
-    # ── report ─────────────────────────────────────────────────────────────
-    subprocess.run(
-        [sys.executable, "splora.py", "report", "--name", RUN_NAME],
-        cwd=PROJECT_ROOT,
-        check=True,
-        capture_output=True,
-    )
-
-    # ── boot (daemon thread, no browser) ──────────────────────────────────
     report_dir = _REPORT_DIR / RUN_NAME
     port = _find_free_port(start=_PORT_START)
     threading.Thread(
@@ -76,17 +70,17 @@ def e2e_pipeline(tmp_path_factory):
     ).start()
     time.sleep(0.3)  # give the server time to bind
 
+    json_path = _FS_DIR / f"{RUN_NAME}.json"
+
     yield {
         "scan_root": scan_root,
         "run_name": RUN_NAME,
-        "json_path": _FS_DIR / f"{RUN_NAME}.json",
+        "json_path": json_path,
         "report_dir": report_dir,
         "port": port,
         "url": f"http://localhost:{port}/",
     }
 
-    # ── teardown: remove all e2e artifacts from data/ ─────────────────────
-    json_path = _FS_DIR / f"{RUN_NAME}.json"
     if json_path.exists():
         json_path.unlink()
     if report_dir.exists():

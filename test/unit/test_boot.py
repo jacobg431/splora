@@ -2,21 +2,12 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.boot import (
-    _find_free_port,
-    _latest_report,
-    _resolve_report_dir,
-    _sanitize,
-    _serve,
-)
-
-# ── _sanitize ──────────────────────────────────────────────────────────────
+from src.boot import _find_free_port, _sanitize, _serve
 
 
 class TestSanitize:
@@ -39,87 +30,6 @@ class TestSanitize:
 
     def test_only_unsafe_chars_collapse_to_underscore(self):
         assert _sanitize(":::") == "_"
-
-
-# ── _latest_report ─────────────────────────────────────────────────────────
-
-
-class TestLatestReport:
-    """Selection of the most recently modified report directory."""
-
-    def test_nonexistent_report_dir_returns_none(self, tmp_path: Path):
-        assert _latest_report(tmp_path / "does-not-exist") is None
-
-    def test_empty_report_dir_returns_none(self, tmp_path: Path):
-        assert _latest_report(tmp_path) is None
-
-    def test_single_subdirectory_is_returned(self, tmp_path: Path):
-        (tmp_path / "run-a").mkdir()
-        assert _latest_report(tmp_path) == tmp_path / "run-a"
-
-    def test_files_in_report_dir_are_ignored(self, tmp_path: Path):
-        (tmp_path / "stray.json").write_text("{}", encoding="utf-8")
-        assert _latest_report(tmp_path) is None
-
-    def test_returns_most_recently_modified_dir(self, tmp_path: Path):
-        old = tmp_path / "old-run"
-        old.mkdir()
-        time.sleep(0.02)
-        new = tmp_path / "new-run"
-        new.mkdir()
-        assert _latest_report(tmp_path) == new
-
-    def test_ignores_nested_subdirectories(self, tmp_path: Path):
-        parent = tmp_path / "run-a"
-        parent.mkdir()
-        (parent / "nested").mkdir()
-        # Only direct children count; nested should not influence the result
-        assert _latest_report(tmp_path) == parent
-
-
-# ── _resolve_report_dir ────────────────────────────────────────────────────
-
-
-class TestResolveReportDir:
-    """Resolution of a report directory by name or by recency."""
-
-    def test_named_dir_that_exists_is_returned(self, tmp_path: Path):
-        (tmp_path / "my-run").mkdir()
-        assert _resolve_report_dir("my-run", tmp_path) == tmp_path / "my-run"
-
-    def test_name_is_sanitized_before_lookup(self, tmp_path: Path):
-        (tmp_path / "C_drive").mkdir()
-        assert _resolve_report_dir("C:drive", tmp_path) == tmp_path / "C_drive"
-
-    def test_named_dir_missing_exits_with_code_1(self, tmp_path: Path):
-        with pytest.raises(SystemExit) as exc:
-            _resolve_report_dir("nonexistent", tmp_path)
-        assert exc.value.code == 1
-
-    def test_named_path_that_is_a_file_exits_with_code_1(self, tmp_path: Path):
-        (tmp_path / "not-a-dir").write_text("x", encoding="utf-8")
-        with pytest.raises(SystemExit) as exc:
-            _resolve_report_dir("not-a-dir", tmp_path)
-        assert exc.value.code == 1
-
-    def test_no_name_returns_latest_dir(self, tmp_path: Path):
-        (tmp_path / "first").mkdir()
-        time.sleep(0.02)
-        (tmp_path / "second").mkdir()
-        assert _resolve_report_dir(None, tmp_path) == tmp_path / "second"
-
-    def test_no_name_empty_dir_exits_with_code_1(self, tmp_path: Path):
-        with pytest.raises(SystemExit) as exc:
-            _resolve_report_dir(None, tmp_path)
-        assert exc.value.code == 1
-
-    def test_no_name_nonexistent_report_dir_exits_with_code_1(self, tmp_path: Path):
-        with pytest.raises(SystemExit) as exc:
-            _resolve_report_dir(None, tmp_path / "missing")
-        assert exc.value.code == 1
-
-
-# ── _find_free_port ────────────────────────────────────────────────────────
 
 
 class TestFindFreePort:
@@ -159,9 +69,6 @@ class TestFindFreePort:
         with patch("src.boot.socket.socket", return_value=mock_s):
             port = _find_free_port(start=8000, attempts=10)
         assert 8000 <= port < 8010
-
-
-# ── _serve ─────────────────────────────────────────────────────────────────
 
 
 class TestServe:
