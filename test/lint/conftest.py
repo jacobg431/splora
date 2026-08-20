@@ -29,12 +29,23 @@ def _python_files() -> list[Path]:
 
 
 @pytest.fixture(scope="session")
-def parsed_files() -> tuple[tuple[Path, ast.Module], ...]:
-    """Return each scanned file as its repository-relative path paired with its syntax tree."""
+def repo_root() -> Path:
+    """Return the repository root that every scanned path is relative to."""
+    return _REPO_ROOT
+
+
+@pytest.fixture(scope="session")
+def source_files() -> tuple[tuple[Path, str], ...]:
+    """Return each scanned file as its repository-relative path paired with its text."""
     return tuple(
-        (file.relative_to(_REPO_ROOT), ast.parse(file.read_text(encoding="utf-8")))
-        for file in _python_files()
+        (file.relative_to(_REPO_ROOT), file.read_text(encoding="utf-8")) for file in _python_files()
     )
+
+
+@pytest.fixture(scope="session")
+def parsed_files(source_files: tuple[tuple[Path, str], ...]) -> tuple[tuple[Path, ast.Module], ...]:
+    """Return each scanned file as its repository-relative path paired with its syntax tree."""
+    return tuple((path, ast.parse(text)) for path, text in source_files)
 
 
 @pytest.fixture(scope="session")
