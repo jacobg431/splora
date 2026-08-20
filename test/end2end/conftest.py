@@ -78,7 +78,8 @@ def e2e_pipeline(tmp_path_factory, run_cli):
         "json_path": json_path,
         "report_dir": report_dir,
         "port": port,
-        "url": f"http://localhost:{port}/",
+        "url": f"http://127.0.0.1:{port}/",
+        "localhost_url": f"http://localhost:{port}/",
     }
 
     if json_path.exists():

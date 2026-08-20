@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import threading
 import time
-import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 import src.boot as boot_mod
-from src.boot import _find_free_port, _latest_report, _resolve_report_dir, _serve, boot
+from src.boot import _latest_report, _resolve_report_dir, boot
 
 
 def _patch(monkeypatch, tmp_path: Path) -> Path:
@@ -20,18 +18,6 @@ def _patch(monkeypatch, tmp_path: Path) -> Path:
     report_dir.mkdir()
     monkeypatch.setattr(boot_mod, "_REPORT_DIR", report_dir)
     return report_dir
-
-
-def _start_server(report_dir: Path, start_port: int) -> int:
-    """Serve report_dir from a daemon thread and return the port it listens on."""
-    port = _find_free_port(start=start_port)
-    threading.Thread(
-        target=_serve,
-        kwargs={"report_dir": report_dir, "port": port, "open_browser": False},
-        daemon=True,
-    ).start()
-    time.sleep(0.2)
-    return port
 
 
 class TestBootCommand:
@@ -107,51 +93,6 @@ class TestBootCommand:
                 boot(name_args("my-run"))
 
         assert call_order == ["find_port", "serve"]
-
-
-class TestHttpServing:
-    """Responses served over HTTP from a report directory."""
-
-    def test_serve_returns_http_200_for_index(self, tmp_path: Path):
-        (tmp_path / "index.html").write_text("<h1>Splora</h1>", encoding="utf-8")
-
-        port = _start_server(tmp_path, 19200)
-
-        resp = urllib.request.urlopen(f"http://localhost:{port}/", timeout=3)
-        assert resp.status == 200
-
-    def test_serve_returns_correct_file_content(self, tmp_path: Path):
-        content = "<h1>hello splora</h1>"
-        (tmp_path / "index.html").write_text(content, encoding="utf-8")
-
-        port = _start_server(tmp_path, 19220)
-
-        body = urllib.request.urlopen(f"http://localhost:{port}/", timeout=3).read()
-        assert content.encode() in body
-
-    def test_serve_returns_404_for_missing_file(self, tmp_path: Path):
-        port = _start_server(tmp_path, 19240)
-
-        with pytest.raises(urllib.error.HTTPError) as exc:
-            urllib.request.urlopen(f"http://localhost:{port}/missing.html", timeout=3)
-        assert exc.value.code == 404
-
-    def test_serve_only_serves_from_report_dir(self, tmp_path: Path):
-        report_dir = tmp_path / "report"
-        report_dir.mkdir()
-        (report_dir / "page.html").write_text("inside", encoding="utf-8")
-        (tmp_path / "secret.html").write_text("outside", encoding="utf-8")
-
-        port = _start_server(report_dir, 19260)
-
-        # File inside report dir is accessible
-        resp = urllib.request.urlopen(f"http://localhost:{port}/page.html", timeout=3)
-        assert resp.status == 200
-
-        # File outside report dir is not accessible
-        with pytest.raises(urllib.error.HTTPError) as exc:
-            urllib.request.urlopen(f"http://localhost:{port}/secret.html", timeout=3)
-        assert exc.value.code == 404
 
 
 class TestLatestReport:

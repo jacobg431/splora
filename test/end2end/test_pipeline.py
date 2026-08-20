@@ -134,8 +134,8 @@ class TestReport:
 class TestBoot:
     """The boot stage of a full pipeline run."""
 
-    def test_server_responds_with_200(self, e2e_pipeline):
-        resp = _fetch(e2e_pipeline)
+    def test_server_responds_on_the_localhost_url_boot_opens(self, e2e_pipeline):
+        resp = urllib.request.urlopen(e2e_pipeline["localhost_url"], timeout=5)
         assert resp.status == 200
 
     def test_index_html_is_served(self, e2e_pipeline):
