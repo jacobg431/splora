@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 import pytest
@@ -34,14 +33,12 @@ def _patch(monkeypatch, tmp_path: Path) -> Path:
     return out_dir
 
 
-def _load(out_dir: Path, name: str) -> dict:
-    return json.loads((out_dir / f"{name}.json").read_text(encoding="utf-8"))
-
-
 class TestExploreCommand:
     """The explore command traversing a tree and writing its JSON."""
 
-    def test_generates_valid_json_with_correct_structure(self, tmp_path: Path, monkeypatch):
+    def test_generates_valid_json_with_correct_structure(
+        self, tmp_path: Path, monkeypatch, load_json
+    ):
         # Keep scan_dir and out_dir as siblings so out_dir is never included in the scan.
         scan_dir = tmp_path / "scan"
         scan_dir.mkdir()
@@ -55,7 +52,7 @@ class TestExploreCommand:
 
         explore(_args(path=str(scan_dir), name="test-run"))
 
-        data = _load(out_dir, "test-run")
+        data = load_json(out_dir / "test-run.json")
 
         assert data["meta"]["name"] == "test-run"
         assert data["meta"]["root"] == str(scan_dir)
@@ -65,17 +62,17 @@ class TestExploreCommand:
         assert len(data["tree"]["children"]) == 1
         assert data["tree"]["children"][0]["name"] == "subdir"
 
-    def test_name_defaults_to_root_folder_name(self, tmp_path: Path, monkeypatch):
+    def test_name_defaults_to_root_folder_name(self, tmp_path: Path, monkeypatch, load_json):
         (tmp_path / "file.txt").write_bytes(b"x")
 
         out_dir = _patch(monkeypatch, tmp_path)
 
         explore(_args(path=str(tmp_path)))  # no explicit name
 
-        data = _load(out_dir, tmp_path.name)
+        data = load_json(out_dir / f"{tmp_path.name}.json")
         assert data["meta"]["name"] == tmp_path.name
 
-    def test_total_size_is_accurate(self, tmp_path: Path, monkeypatch):
+    def test_total_size_is_accurate(self, tmp_path: Path, monkeypatch, load_json):
         (tmp_path / "small.bin").write_bytes(b"x" * 100)
         (tmp_path / "large.bin").write_bytes(b"y" * 900)
 
@@ -83,10 +80,10 @@ class TestExploreCommand:
 
         explore(_args(path=str(tmp_path), name="size-run"))
 
-        data = _load(out_dir, "size-run")
+        data = load_json(out_dir / "size-run.json")
         assert data["meta"]["total_size"] == 1000
 
-    def test_marks_partial_when_max_files_reached(self, tmp_path: Path, monkeypatch):
+    def test_marks_partial_when_max_files_reached(self, tmp_path: Path, monkeypatch, load_json):
         for i in range(10):
             (tmp_path / f"file{i}.txt").write_bytes(b"x")
 
@@ -94,11 +91,11 @@ class TestExploreCommand:
 
         explore(_args(path=str(tmp_path), name="partial-run", max_files=5))
 
-        data = _load(out_dir, "partial-run")
+        data = load_json(out_dir / "partial-run.json")
         assert data["meta"]["partial"] is True
         assert data["meta"]["total_files"] <= 5
 
-    def test_marks_partial_when_timeout_expires(self, tmp_path: Path, monkeypatch):
+    def test_marks_partial_when_timeout_expires(self, tmp_path: Path, monkeypatch, load_json):
         for i in range(200):
             (tmp_path / f"file{i}.py").write_bytes(b"x" * 1000)
 
@@ -106,10 +103,10 @@ class TestExploreCommand:
 
         explore(_args(path=str(tmp_path), name="timeout-run", timeout=0.0001))
 
-        data = _load(out_dir, "timeout-run")
+        data = load_json(out_dir / "timeout-run.json")
         assert data["meta"]["partial"] is True
 
-    def test_respects_exclude_list(self, tmp_path: Path, monkeypatch):
+    def test_respects_exclude_list(self, tmp_path: Path, monkeypatch, load_json):
         keep = tmp_path / "keep"
         keep.mkdir()
         (keep / "file.txt").write_bytes(b"x")
@@ -122,13 +119,13 @@ class TestExploreCommand:
 
         explore(_args(path=str(tmp_path), name="exc-run", exclude=["node_modules"]))
 
-        data = _load(out_dir, "exc-run")
+        data = load_json(out_dir / "exc-run.json")
         assert data["meta"]["total_files"] == 1
         child_names = [c["name"] for c in data["tree"]["children"]]
         assert "node_modules" not in child_names
         assert "keep" in child_names
 
-    def test_depth_limit_prevents_deep_traversal(self, tmp_path: Path, monkeypatch):
+    def test_depth_limit_prevents_deep_traversal(self, tmp_path: Path, monkeypatch, load_json):
         # root/a/b/c/deep.txt is 3 levels deep; root/a/shallow.txt is 1 level deep
         deep = tmp_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
@@ -140,10 +137,12 @@ class TestExploreCommand:
         # depth=2: root(0) → a(1) → b(2) → c is at depth 2 so NOT entered
         explore(_args(path=str(tmp_path), name="depth-run", depth=2))
 
-        data = _load(out_dir, "depth-run")
+        data = load_json(out_dir / "depth-run.json")
         assert data["meta"]["total_files"] == 1  # only shallow.txt
 
-    def test_extension_and_category_distribution_in_output(self, tmp_path: Path, monkeypatch):
+    def test_extension_and_category_distribution_in_output(
+        self, tmp_path: Path, monkeypatch, load_json
+    ):
         (tmp_path / "photo.jpg").write_bytes(b"img")
         (tmp_path / "code.py").write_bytes(b"src")
         (tmp_path / "archive.zip").write_bytes(b"zip")
@@ -152,7 +151,7 @@ class TestExploreCommand:
 
         explore(_args(path=str(tmp_path), name="cat-run"))
 
-        data = _load(out_dir, "cat-run")
+        data = load_json(out_dir / "cat-run.json")
         tree = data["tree"]
         assert tree["extensions"][".jpg"] == 1
         assert tree["extensions"][".py"] == 1
@@ -172,7 +171,7 @@ class TestExploreCommand:
         assert (out_dir / "atomic-run.json").exists()
         assert not (out_dir / "atomic-run.tmp").exists()
 
-    def test_child_stats_are_aggregated_to_root(self, tmp_path: Path, monkeypatch):
+    def test_child_stats_are_aggregated_to_root(self, tmp_path: Path, monkeypatch, load_json):
         sub = tmp_path / "sub"
         sub.mkdir()
         (sub / "a.py").write_bytes(b"x" * 50)
@@ -182,7 +181,7 @@ class TestExploreCommand:
 
         explore(_args(path=str(tmp_path), name="agg-run"))
 
-        data = _load(out_dir, "agg-run")
+        data = load_json(out_dir / "agg-run.json")
         assert data["tree"]["size"] == 100
         assert data["tree"]["file_count"] == 2
         # .py is Source Code; .txt is Other — both should appear at root level

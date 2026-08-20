@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import threading
 import time
 import urllib.request
@@ -13,10 +12,6 @@ import pytest
 
 import src.boot as boot_mod
 from src.boot import _find_free_port, _latest_report, _resolve_report_dir, _serve, boot
-
-
-def _args(name: str | None = None) -> argparse.Namespace:
-    return argparse.Namespace(name=name)
 
 
 def _patch(monkeypatch, tmp_path: Path) -> Path:
@@ -42,17 +37,21 @@ def _start_server(report_dir: Path, start_port: int) -> int:
 class TestBootCommand:
     """The boot command resolving a report and starting the server."""
 
-    def test_calls_serve_with_correct_directory_and_port(self, tmp_path: Path, monkeypatch):
+    def test_calls_serve_with_correct_directory_and_port(
+        self, tmp_path: Path, monkeypatch, name_args
+    ):
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
 
         with patch.object(boot_mod, "_serve") as mock_serve:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
-                boot(_args("my-run"))
+                boot(name_args("my-run"))
 
         mock_serve.assert_called_once_with(report_dir / "my-run", 9001)
 
-    def test_resolves_latest_report_when_no_name_given(self, tmp_path: Path, monkeypatch):
+    def test_resolves_latest_report_when_no_name_given(
+        self, tmp_path: Path, monkeypatch, name_args
+    ):
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "first").mkdir()
         time.sleep(0.02)
@@ -60,35 +59,37 @@ class TestBootCommand:
 
         with patch.object(boot_mod, "_serve") as mock_serve:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
-                boot(_args())
+                boot(name_args())
 
         mock_serve.assert_called_once_with(report_dir / "second", 9001)
 
-    def test_name_sanitization_resolves_correct_directory(self, tmp_path: Path, monkeypatch):
+    def test_name_sanitization_resolves_correct_directory(
+        self, tmp_path: Path, monkeypatch, name_args
+    ):
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "C_drive").mkdir()
 
         with patch.object(boot_mod, "_serve") as mock_serve:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
-                boot(_args("C:drive"))
+                boot(name_args("C:drive"))
 
         mock_serve.assert_called_once_with(report_dir / "C_drive", 9001)
 
-    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch):
+    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            boot(_args("nonexistent"))
+            boot(name_args("nonexistent"))
         assert exc.value.code == 1
 
-    def test_empty_report_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch):
+    def test_empty_report_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            boot(_args())
+            boot(name_args())
         assert exc.value.code == 1
 
-    def test_port_is_found_before_serve_is_called(self, tmp_path: Path, monkeypatch):
+    def test_port_is_found_before_serve_is_called(self, tmp_path: Path, monkeypatch, name_args):
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
 
@@ -103,7 +104,7 @@ class TestBootCommand:
 
         with patch.object(boot_mod, "_find_free_port", side_effect=fake_find_port):
             with patch.object(boot_mod, "_serve", side_effect=fake_serve):
-                boot(_args("my-run"))
+                boot(name_args("my-run"))
 
         assert call_order == ["find_port", "serve"]
 
