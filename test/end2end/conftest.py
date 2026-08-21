@@ -8,11 +8,13 @@ All artifacts written to data/filesystem/ and data/report/ are deleted on teardo
 from __future__ import annotations
 
 import shutil
+import socket
 import subprocess
 import sys
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -24,6 +26,43 @@ from src.report import _REPORT_DIR
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RUN_NAME = "splora-e2e"
 _PORT_START = 15000
+
+
+@dataclass(frozen=True)
+class _Server:
+    """A report server listening in a background thread."""
+
+    port: int
+    url: str
+
+
+def _wait_until_listening(port: int, timeout: float = 5.0) -> None:
+    """Block until the server accepts a connection on port."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                return
+        except OSError:
+            time.sleep(0.01)
+    raise AssertionError(f"no server listening on port {port} after {timeout}s")
+
+
+@pytest.fixture(scope="session")
+def serve_dir() -> Callable[..., _Server]:
+    """Return a helper that serves a directory in the background once it accepts connections."""
+
+    def serve(report_dir: Path, start_port: int = _PORT_START) -> _Server:
+        port = _find_free_port(start=start_port)
+        threading.Thread(
+            target=_serve,
+            kwargs={"report_dir": report_dir, "port": port, "open_browser": False},
+            daemon=True,
+        ).start()
+        _wait_until_listening(port)
+        return _Server(port=port, url=f"http://127.0.0.1:{port}/")
+
+    return serve
 
 
 def _build_scan_tree(root: Path) -> None:
@@ -53,7 +92,7 @@ def run_cli() -> Callable[..., None]:
 
 
 @pytest.fixture(scope="session")
-def e2e_pipeline(tmp_path_factory, run_cli):
+def e2e_pipeline(tmp_path_factory, run_cli, serve_dir):
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)
@@ -62,13 +101,7 @@ def e2e_pipeline(tmp_path_factory, run_cli):
     run_cli("report", "--name", RUN_NAME)
 
     report_dir = _REPORT_DIR / RUN_NAME
-    port = _find_free_port(start=_PORT_START)
-    threading.Thread(
-        target=_serve,
-        kwargs={"report_dir": report_dir, "port": port, "open_browser": False},
-        daemon=True,
-    ).start()
-    time.sleep(0.3)  # give the server time to bind
+    server = serve_dir(report_dir)
 
     json_path = _FS_DIR / f"{RUN_NAME}.json"
 
@@ -77,9 +110,9 @@ def e2e_pipeline(tmp_path_factory, run_cli):
         "run_name": RUN_NAME,
         "json_path": json_path,
         "report_dir": report_dir,
-        "port": port,
-        "url": f"http://127.0.0.1:{port}/",
-        "localhost_url": f"http://localhost:{port}/",
+        "port": server.port,
+        "url": server.url,
+        "localhost_url": f"http://localhost:{server.port}/",
     }
 
     if json_path.exists():

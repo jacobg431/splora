@@ -3,8 +3,7 @@
 Run with:
     pytest test/end2end/
 
-These tests are excluded from the default `pytest` run (testpaths in
-pyproject.toml covers only test/unit and test/integration).
+These tests are excluded from the default `pytest` run.
 """
 
 from __future__ import annotations
