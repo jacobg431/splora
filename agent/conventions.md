@@ -73,5 +73,5 @@ helpers. A test belongs to the narrowest tier that can express it. The lint tier
 text and runs no behavior, so it sits outside the filesystem-I/O distinction below. Unit tests
 stay pure — no filesystem or process I/O. A test that touches the filesystem is an integration
 test, unless it drives a real running process or server, which puts it in the end-to-end tier
-instead. The end-to-end tier can be slow, so it is excluded from the default run and invoked
-explicitly.
+instead. The end-to-end tier can take longer to complete compared to other tiers, due to running
+real processes, so it is excluded from the default run and invoked explicitly.
