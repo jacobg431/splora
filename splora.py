@@ -6,6 +6,7 @@ from src.report import report
 
 
 def main() -> None:
+    """Parse command-line arguments and dispatch to the requested command."""
     parser = argparse.ArgumentParser(
         prog="splora",
         description="A locally hosted, cross-platform file system data visualization tool.",

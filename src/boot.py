@@ -21,7 +21,7 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     """SimpleHTTPRequestHandler with per-request logging suppressed."""
 
     def log_message(self, *_) -> None:
-        pass
+        """Discard the per-request log line the base handler would emit."""
 
 
 def _sanitize(s: str) -> str:
@@ -39,7 +39,7 @@ def _latest_report(report_dir: Path) -> Path | None:
 
 
 def _resolve_report_dir(name: str | None, report_dir: Path) -> Path:
-    """Return the report directory to serve. Exits with code 1 on failure."""
+    """Return the report directory to serve, exiting with code 1 on failure."""
     if name:
         path = report_dir / _sanitize(name)
         if not path.is_dir():
@@ -82,6 +82,7 @@ def _serve(report_dir: Path, port: int, *, open_browser: bool = True) -> None:
 
 
 def boot(args: argparse.Namespace) -> None:
+    """Serve a generated report over HTTP and open it in the browser."""
     report_dir = _resolve_report_dir(args.name, _REPORT_DIR)
     port = _find_free_port()
     _serve(report_dir, port)

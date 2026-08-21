@@ -1,13 +1,7 @@
-"""Integration tests for src/report.py.
-
-All tests call report() end-to-end. Module-level path constants (_FS_DIR,
-_TEMPLATE_DIR, _REPORT_DIR) are redirected via monkeypatch so no real project
-directories are touched.
-"""
+"""Integration tests for src/report.py."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import shutil
 import time
@@ -16,14 +10,16 @@ from pathlib import Path
 import pytest
 
 import src.report as report_mod
-from src.report import report
+from src.report import (
+    _build_report,
+    _latest_json,
+    _missing_assets,
+    _read_json,
+    _resolve_json_path,
+    report,
+)
 
-
-# ── Shared helpers ─────────────────────────────────────────────────────────
-
-
-def _args(name: str | None = None) -> argparse.Namespace:
-    return argparse.Namespace(name=name)
+_TEMPLATE_FILES = ("index.html", "style.css", "main.js")
 
 
 def _make_fs_json(fs_dir: Path, run_name: str, *, partial: bool = False) -> Path:
@@ -53,17 +49,30 @@ def _make_fs_json(fs_dir: Path, run_name: str, *, partial: bool = False) -> Path
     return path
 
 
+def _make_template_dir(parent: Path) -> Path:
+    """Create a template directory holding every asset a report requires."""
+    template_dir = parent / "template"
+    template_dir.mkdir()
+    for name in _TEMPLATE_FILES:
+        (template_dir / name).write_text(f"content-{name}", encoding="utf-8")
+    return template_dir
+
+
+def _make_nested_template_dir(parent: Path) -> Path:
+    """Create a template directory that also holds a nested asset folder."""
+    template_dir = _make_template_dir(parent)
+    (template_dir / "core").mkdir()
+    (template_dir / "core" / "widget.js").write_text("content-widget.js", encoding="utf-8")
+    return template_dir
+
+
 def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path]:
     """Create the directories and monkeypatch the module constants."""
     fs_dir = tmp_path / "filesystem"
     report_dir = tmp_path / "report"
-    template_dir = tmp_path / "template"
+    template_dir = _make_template_dir(tmp_path)
 
     fs_dir.mkdir()
-    template_dir.mkdir()
-
-    for fname in ("index.html", "style.css", "main.js"):
-        (template_dir / fname).write_text(f"<!-- {fname} -->", encoding="utf-8")
 
     monkeypatch.setattr(report_mod, "_FS_DIR", fs_dir)
     monkeypatch.setattr(report_mod, "_REPORT_DIR", report_dir)
@@ -72,15 +81,14 @@ def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path]:
     return fs_dir, report_dir, template_dir
 
 
-# ── Tests ──────────────────────────────────────────────────────────────────
-
-
 class TestReportCommand:
-    def test_generates_complete_report_folder(self, tmp_path: Path, monkeypatch):
+    """The report command turning a recorded run into a report folder."""
+
+    def test_generates_complete_report_folder(self, tmp_path: Path, monkeypatch, name_args):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
-        report(_args("my-run"))
+        report(name_args("my-run"))
 
         out = report_dir / "my-run"
         assert (out / "index.html").exists()
@@ -88,54 +96,58 @@ class TestReportCommand:
         assert (out / "main.js").exists()
         assert (out / "data.json").exists()
 
-    def test_data_json_content_matches_source(self, tmp_path: Path, monkeypatch):
+    def test_data_json_content_matches_source(self, tmp_path: Path, monkeypatch, name_args):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         src_path = _make_fs_json(fs_dir, "my-run")
 
-        report(_args("my-run"))
+        report(name_args("my-run"))
 
         written = (report_dir / "my-run" / "data.json").read_text(encoding="utf-8")
         assert written == src_path.read_text(encoding="utf-8")
 
-    def test_falls_back_to_latest_json_when_no_name_given(self, tmp_path: Path, monkeypatch):
+    def test_falls_back_to_latest_json_when_no_name_given(
+        self, tmp_path: Path, monkeypatch, name_args
+    ):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "first")
         time.sleep(0.02)
         _make_fs_json(fs_dir, "second")
 
-        report(_args())  # no explicit name
+        report(name_args())  # no explicit name
 
         assert (report_dir / "second").exists()
         assert not (report_dir / "first").exists()
 
-    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch):
+    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            report(_args("does-not-exist"))
+            report(name_args("does-not-exist"))
         assert exc.value.code == 1
 
-    def test_empty_filesystem_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch):
+    def test_empty_filesystem_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            report(_args())
+            report(name_args())
         assert exc.value.code == 1
 
-    def test_missing_template_file_exits_with_code_1(self, tmp_path: Path, monkeypatch):
+    def test_missing_template_file_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         fs_dir, _, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         (template_dir / "style.css").unlink()
 
         with pytest.raises(SystemExit) as exc:
-            report(_args("my-run"))
+            report(name_args("my-run"))
         assert exc.value.code == 1
 
-    def test_re_running_updates_existing_report(self, tmp_path: Path, monkeypatch):
+    def test_re_running_updates_existing_report(
+        self, tmp_path: Path, monkeypatch, name_args, load_json
+    ):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
-        report(_args("my-run"))
+        report(name_args("my-run"))
 
         updated_payload = {
             "meta": {"name": "my-run", "partial": False, "total_files": 99, "root": "/new"},
@@ -143,50 +155,253 @@ class TestReportCommand:
         }
         (fs_dir / "my-run.json").write_text(json.dumps(updated_payload), encoding="utf-8")
 
-        report(_args("my-run"))
+        report(name_args("my-run"))
 
-        data = json.loads((report_dir / "my-run" / "data.json").read_text(encoding="utf-8"))
+        data = load_json(report_dir / "my-run" / "data.json")
         assert data["meta"]["total_files"] == 99
 
-    def test_partial_scan_does_not_prevent_report_generation(self, tmp_path: Path, monkeypatch):
+    def test_partial_scan_does_not_prevent_report_generation(
+        self, tmp_path: Path, monkeypatch, name_args
+    ):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "partial-run", partial=True)
 
-        report(_args("partial-run"))
+        report(name_args("partial-run"))
 
         assert (report_dir / "partial-run" / "data.json").exists()
 
-    def test_name_sanitization_finds_correct_file(self, tmp_path: Path, monkeypatch):
+    def test_name_sanitization_finds_correct_file(self, tmp_path: Path, monkeypatch, name_args):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "C_drive")  # stored with sanitized name
 
-        report(_args("C:drive"))  # user passes unsanitized version
+        report(name_args("C:drive"))  # user passes unsanitized version
 
         assert (report_dir / "C_drive").exists()
 
-    def test_report_output_contains_no_extra_files(self, tmp_path: Path, monkeypatch):
+    def test_report_output_contains_no_extra_files(self, tmp_path: Path, monkeypatch, name_args):
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "clean-run")
 
-        report(_args("clean-run"))
+        report(name_args("clean-run"))
 
         top = {p.name for p in (report_dir / "clean-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "data.json"}
 
-    def test_stale_asset_removed_after_template_change(self, tmp_path: Path, monkeypatch):
+    def test_stale_asset_removed_after_template_change(
+        self, tmp_path: Path, monkeypatch, name_args
+    ):
         fs_dir, report_dir, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         (template_dir / "legacy").mkdir()
         (template_dir / "legacy" / "old-widget.js").write_text("// old", encoding="utf-8")
 
-        report(_args("my-run"))
+        report(name_args("my-run"))
         assert (report_dir / "my-run" / "legacy" / "old-widget.js").exists()
 
         shutil.rmtree(template_dir / "legacy")
         (template_dir / "core").mkdir()
         (template_dir / "core" / "widget.js").write_text("// widget", encoding="utf-8")
 
-        report(_args("my-run"))
+        report(name_args("my-run"))
 
         top = {p.name for p in (report_dir / "my-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "core", "data.json"}
+
+
+class TestLatestJson:
+    """Selection of the most recently modified filesystem JSON."""
+
+    def test_empty_directory_returns_none(self, tmp_path: Path):
+        assert _latest_json(tmp_path) is None
+
+    def test_single_json_is_returned(self, tmp_path: Path):
+        f = tmp_path / "only.json"
+        f.write_text("{}", encoding="utf-8")
+        assert _latest_json(tmp_path) == f
+
+    def test_non_json_files_are_ignored(self, tmp_path: Path):
+        (tmp_path / "note.txt").write_text("x", encoding="utf-8")
+        assert _latest_json(tmp_path) is None
+
+    def test_returns_most_recently_modified(self, tmp_path: Path):
+        old = tmp_path / "old.json"
+        new = tmp_path / "new.json"
+        old.write_text("{}", encoding="utf-8")
+        time.sleep(0.02)  # ensure distinct mtime on any filesystem
+        new.write_text("{}", encoding="utf-8")
+        assert _latest_json(tmp_path) == new
+
+    def test_ignores_json_in_subdirectories(self, tmp_path: Path):
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (sub / "nested.json").write_text("{}", encoding="utf-8")
+        assert _latest_json(tmp_path) is None
+
+
+class TestResolveJsonPath:
+    """Resolution of a source JSON file by name or by recency."""
+
+    def test_named_file_that_exists_is_returned(self, tmp_path: Path):
+        f = tmp_path / "my-run.json"
+        f.write_text("{}", encoding="utf-8")
+        assert _resolve_json_path("my-run", tmp_path) == f
+
+    def test_name_is_sanitized_before_lookup(self, tmp_path: Path):
+        f = tmp_path / "C_drive.json"
+        f.write_text("{}", encoding="utf-8")
+        assert _resolve_json_path("C:drive", tmp_path) == f
+
+    def test_named_file_missing_exits_with_code_1(self, tmp_path: Path):
+        with pytest.raises(SystemExit) as exc:
+            _resolve_json_path("nonexistent", tmp_path)
+        assert exc.value.code == 1
+
+    def test_no_name_returns_latest(self, tmp_path: Path):
+        a = tmp_path / "a.json"
+        b = tmp_path / "b.json"
+        a.write_text("{}", encoding="utf-8")
+        time.sleep(0.02)
+        b.write_text("{}", encoding="utf-8")
+        assert _resolve_json_path(None, tmp_path) == b
+
+    def test_no_name_and_empty_dir_exits_with_code_1(self, tmp_path: Path):
+        with pytest.raises(SystemExit) as exc:
+            _resolve_json_path(None, tmp_path)
+        assert exc.value.code == 1
+
+
+class TestReadJson:
+    """Reading and parsing of a recorded run's JSON file."""
+
+    def test_valid_json_returns_raw_and_dict(self, tmp_path: Path):
+        payload = {"meta": {"name": "test"}, "tree": {}}
+        f = tmp_path / "data.json"
+        f.write_text(json.dumps(payload), encoding="utf-8")
+
+        raw, data = _read_json(f)
+
+        assert isinstance(raw, str)
+        assert data["meta"]["name"] == "test"
+
+    def test_raw_text_matches_file_content(self, tmp_path: Path):
+        content = '{"key": "value"}'
+        f = tmp_path / "data.json"
+        f.write_text(content, encoding="utf-8")
+
+        raw, _ = _read_json(f)
+
+        assert raw == content
+
+    def test_missing_file_exits_with_code_1(self, tmp_path: Path):
+        with pytest.raises(SystemExit) as exc:
+            _read_json(tmp_path / "nonexistent.json")
+        assert exc.value.code == 1
+
+    def test_malformed_json_exits_with_code_1(self, tmp_path: Path):
+        f = tmp_path / "bad.json"
+        f.write_text("{ not valid json", encoding="utf-8")
+        with pytest.raises(SystemExit) as exc:
+            _read_json(f)
+        assert exc.value.code == 1
+
+
+class TestMissingAssets:
+    """Detection of template files absent from the asset directory."""
+
+    def test_all_assets_present_returns_empty_list(self, tmp_path: Path):
+        t = _make_template_dir(tmp_path)
+        assert _missing_assets(t) == []
+
+    def test_missing_template_file_is_reported(self, tmp_path: Path):
+        t = _make_template_dir(tmp_path)
+        (t / "style.css").unlink()
+        missing = _missing_assets(t)
+        assert "style.css" in missing
+
+    def test_all_template_files_missing_are_reported(self, tmp_path: Path):
+        t = tmp_path / "empty_template"
+        t.mkdir()
+        missing = _missing_assets(t)
+        assert set(missing) == {"index.html", "style.css", "main.js"}
+
+
+class TestBuildReport:
+    """Construction of a report directory from the template tree."""
+
+    def test_creates_expected_files(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+
+        _build_report(out_dir, template_dir, '{"meta":{}}')
+
+        assert (out_dir / "index.html").exists()
+        assert (out_dir / "style.css").exists()
+        assert (out_dir / "main.js").exists()
+        assert (out_dir / "core" / "widget.js").exists()
+        assert (out_dir / "data.json").exists()
+
+    def test_data_json_content_matches_raw_input(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+        raw = '{"meta": {"name": "test-run"}}'
+
+        _build_report(out_dir, template_dir, raw)
+
+        assert (out_dir / "data.json").read_text(encoding="utf-8") == raw
+
+    def test_template_content_is_copied_correctly(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert (out_dir / "index.html").read_text() == "content-index.html"
+        assert (out_dir / "style.css").read_text() == "content-style.css"
+        assert (out_dir / "main.js").read_text() == "content-main.js"
+        assert (out_dir / "core" / "widget.js").read_text() == "content-widget.js"
+
+    def test_creates_output_dir_if_missing(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "deeply" / "nested" / "report"
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert out_dir.is_dir()
+
+    def test_idempotent_on_second_call(self, tmp_path: Path, load_json):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report"
+
+        _build_report(out_dir, template_dir, '{"v":1}')
+        _build_report(out_dir, template_dir, '{"v":2}')
+
+        assert load_json(out_dir / "data.json")["v"] == 2
+
+    def test_no_extra_files_in_output(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report"
+
+        _build_report(out_dir, template_dir, "{}")
+
+        top_level = {p.name for p in out_dir.iterdir()}
+        assert top_level == {"index.html", "style.css", "main.js", "core", "data.json"}
+
+    def test_removes_preexisting_top_level_file_not_in_template(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report"
+        out_dir.mkdir()
+        (out_dir / "stale.js").write_text("leftover", encoding="utf-8")
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert not (out_dir / "stale.js").exists()
+
+    def test_removes_preexisting_nested_directory_not_in_template(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report"
+        (out_dir / "legacy").mkdir(parents=True)
+        (out_dir / "legacy" / "old-widget.js").write_text("leftover", encoding="utf-8")
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert not (out_dir / "legacy").exists()

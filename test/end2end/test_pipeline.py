@@ -3,53 +3,61 @@
 Run with:
     pytest test/end2end/
 
-These tests are excluded from the default `pytest` run (testpaths in
-pyproject.toml covers only test/unit and test/integration).
+These tests are excluded from the default `pytest` run.
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 import urllib.error
 import urllib.request
+from http.client import HTTPResponse
+from pathlib import Path
 
 import pytest
 
-from src.report import _REPO_ROOT, _TEMPLATE_DIR
+from src.report import _TEMPLATE_DIR
 
 
-# ── explore ────────────────────────────────────────────────────────────────
+def _load_json(path: Path) -> dict:
+    """Return the parsed contents of a JSON file."""
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _fetch(pipeline: dict, path: str = "") -> HTTPResponse:
+    """Request a path from the report server the pipeline started."""
+    return urllib.request.urlopen(pipeline["url"] + path, timeout=5)
 
 
 class TestExplore:
+    """The explore stage of a full pipeline run."""
+
     def test_json_file_is_created(self, e2e_pipeline):
         assert e2e_pipeline["json_path"].exists()
 
     def test_json_is_not_partial(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         assert data["meta"]["partial"] is False
 
     def test_run_name_matches(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         assert data["meta"]["name"] == e2e_pipeline["run_name"]
 
     def test_root_path_matches_scan_directory(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         assert data["meta"]["root"] == str(e2e_pipeline["scan_root"])
 
     def test_total_file_count_is_correct(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         assert data["meta"]["total_files"] == 5
 
     def test_tree_has_one_subdirectory(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         assert len(data["tree"]["children"]) == 1
         assert data["tree"]["children"][0]["name"] == "subdir"
 
     def test_extension_distribution_is_correct(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         exts = data["tree"]["extensions"]
         assert exts.get(".py") == 1
         assert exts.get(".txt") == 1
@@ -58,7 +66,7 @@ class TestExplore:
         assert exts.get(".mp4") == 1
 
     def test_category_distribution_is_correct(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         cats = data["tree"]["categories"]
         assert cats.get("Source Code") == 1
         assert cats.get("Other") == 1  # .txt
@@ -67,7 +75,7 @@ class TestExplore:
         assert cats.get("Video") == 1
 
     def test_total_size_matches_actual_files(self, e2e_pipeline):
-        data = json.loads(e2e_pipeline["json_path"].read_text(encoding="utf-8"))
+        data = _load_json(e2e_pipeline["json_path"])
         # Sum up the sizes of all files we created in _build_scan_tree
         expected = (
             len(b"print('hello')")  # main.py
@@ -79,10 +87,9 @@ class TestExplore:
         assert data["meta"]["total_size"] == expected
 
 
-# ── report ─────────────────────────────────────────────────────────────────
-
-
 class TestReport:
+    """The report stage of a full pipeline run."""
+
     def test_report_directory_exists(self, e2e_pipeline):
         assert e2e_pipeline["report_dir"].is_dir()
 
@@ -107,7 +114,7 @@ class TestReport:
         template_top = {p.name for p in _TEMPLATE_DIR.iterdir()}
         assert top == template_top | {"data.json"}
 
-    def test_regenerating_report_removes_stale_files(self, e2e_pipeline):
+    def test_regenerating_report_removes_stale_files(self, e2e_pipeline, run_cli):
         report_dir = e2e_pipeline["report_dir"]
         stale_file = report_dir / "legacy_script.js"
         stale_nested = report_dir / "legacy" / "old-widget.js"
@@ -115,12 +122,7 @@ class TestReport:
         stale_nested.parent.mkdir()
         stale_nested.write_text("leftover", encoding="utf-8")
 
-        subprocess.run(
-            [sys.executable, "splora.py", "report", "--name", e2e_pipeline["run_name"]],
-            cwd=_REPO_ROOT,
-            check=True,
-            capture_output=True,
-        )
+        run_cli("report", "--name", e2e_pipeline["run_name"])
 
         assert not stale_file.exists()
         assert not (report_dir / "legacy").exists()
@@ -128,52 +130,51 @@ class TestReport:
             assert (report_dir / fname).exists()
 
 
-# ── boot ───────────────────────────────────────────────────────────────────
-
-
 class TestBoot:
-    def test_server_responds_with_200(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"], timeout=5)
+    """The boot stage of a full pipeline run."""
+
+    def test_server_responds_on_the_localhost_url_boot_opens(self, e2e_pipeline):
+        resp = urllib.request.urlopen(e2e_pipeline["localhost_url"], timeout=5)
         assert resp.status == 200
 
     def test_index_html_is_served(self, e2e_pipeline):
-        body = urllib.request.urlopen(e2e_pipeline["url"], timeout=5).read().decode()
+        body = _fetch(e2e_pipeline).read().decode()
         assert "<html" in body.lower()
 
     def test_stylesheet_is_served(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"] + "style.css", timeout=5)
+        resp = _fetch(e2e_pipeline, "style.css")
         assert resp.status == 200
 
     def test_main_module_is_served(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"] + "main.js", timeout=5)
+        resp = _fetch(e2e_pipeline, "main.js")
         assert resp.status == 200
 
     def test_data_json_is_served(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"] + "data.json", timeout=5)
+        resp = _fetch(e2e_pipeline, "data.json")
         assert resp.status == 200
 
     def test_data_json_has_correct_run_name(self, e2e_pipeline):
-        body = urllib.request.urlopen(e2e_pipeline["url"] + "data.json", timeout=5).read()
+        body = _fetch(e2e_pipeline, "data.json").read()
         data = json.loads(body.decode())
         assert data["meta"]["name"] == e2e_pipeline["run_name"]
 
     def test_data_json_file_count_is_correct(self, e2e_pipeline):
-        body = urllib.request.urlopen(e2e_pipeline["url"] + "data.json", timeout=5).read()
+        body = _fetch(e2e_pipeline, "data.json").read()
         data = json.loads(body.decode())
         assert data["meta"]["total_files"] == 5
 
     def test_module_is_served(self, e2e_pipeline):
-        resp = urllib.request.urlopen(e2e_pipeline["url"] + "core/theme.js", timeout=5)
+        resp = _fetch(e2e_pipeline, "core/theme.js")
         assert resp.status == 200
         assert "javascript" in resp.headers.get("Content-Type", "")
 
     def test_unknown_path_returns_404(self, e2e_pipeline):
         with pytest.raises(urllib.error.HTTPError) as exc:
-            urllib.request.urlopen(e2e_pipeline["url"] + "nonexistent.html", timeout=5)
+            _fetch(e2e_pipeline, "nonexistent.html")
         assert exc.value.code == 404
 
     def test_parent_directory_traversal_is_blocked(self, e2e_pipeline):
         # Files outside the report dir should not be accessible
         with pytest.raises(urllib.error.HTTPError) as exc:
-            urllib.request.urlopen(e2e_pipeline["url"] + "../splora.py", timeout=5)
+            _fetch(e2e_pipeline, "../splora.py")
         assert exc.value.code in (400, 404)

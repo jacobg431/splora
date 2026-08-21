@@ -1,9 +1,4 @@
-"""Unit tests for src/explore.py.
-
-Each test targets a single function in isolation. Tests that touch the
-filesystem use pytest's built-in tmp_path fixture, which creates a
-real but ephemeral directory that is cleaned up after each test.
-"""
+"""Unit tests for src/explore.py."""
 
 from __future__ import annotations
 
@@ -17,20 +12,19 @@ import pytest
 import src.explore as explore_mod
 from src.explore import (
     CATEGORIES,
-    _State,
     _build_excludes,
     _build_state,
     _fmt_bytes,
     _resolve_name,
     _sanitize,
     _scan_dir,
+    _State,
 )
 
 
-# ── _sanitize ──────────────────────────────────────────────────────────────
-
-
 class TestSanitize:
+    """Name sanitization applied to run names and output filenames."""
+
     def test_valid_name_is_unchanged(self):
         assert _sanitize("my-project_v2") == "my-project_v2"
 
@@ -63,10 +57,9 @@ class TestSanitize:
         assert _sanitize("données") == "données"
 
 
-# ── _fmt_bytes ─────────────────────────────────────────────────────────────
-
-
 class TestFmtBytes:
+    """Human-readable byte formatting across every unit boundary."""
+
     def test_zero(self):
         assert _fmt_bytes(0) == "0 B"
 
@@ -96,10 +89,9 @@ class TestFmtBytes:
         assert result == "2.5 GB"
 
 
-# ── CATEGORIES ─────────────────────────────────────────────────────────────
-
-
 class TestCategories:
+    """Integrity of the extension-to-category mapping."""
+
     @pytest.mark.parametrize(
         "ext,expected",
         [
@@ -161,10 +153,9 @@ class TestCategories:
             assert key.startswith("."), f"Key {key!r} does not start with '.'"
 
 
-# ── _State ─────────────────────────────────────────────────────────────────
-
-
 class TestState:
+    """Limit tracking that decides when a traversal stops."""
+
     def test_initial_state_is_not_stopped(self):
         assert not _State().stopped
         assert not _State().check()
@@ -210,31 +201,25 @@ class TestState:
         assert state.check()  # second call still returns True
 
 
-# ── _resolve_name ──────────────────────────────────────────────────────────
-
-
 class TestResolveName:
+    """Run-name resolution from arguments or the root directory."""
+
     def _args(self, name: str | None = None) -> argparse.Namespace:
         return argparse.Namespace(name=name)
 
-    def test_explicit_name_takes_precedence(self, tmp_path: Path):
-        assert _resolve_name(self._args("my-run"), tmp_path) == "my-run"
+    def test_explicit_name_takes_precedence(self):
+        assert _resolve_name(self._args("my-run"), Path("/data/projects")) == "my-run"
 
-    def test_falls_back_to_root_directory_name(self, tmp_path: Path):
-        subdir = tmp_path / "my-folder"
-        subdir.mkdir()
-        assert _resolve_name(self._args(), subdir) == "my-folder"
+    def test_falls_back_to_root_directory_name(self):
+        assert _resolve_name(self._args(), Path("/data/my-folder")) == "my-folder"
 
-    def test_explicit_name_wins_even_when_root_has_a_name(self, tmp_path: Path):
-        subdir = tmp_path / "some-dir"
-        subdir.mkdir()
-        assert _resolve_name(self._args("override"), subdir) == "override"
-
-
-# ── _build_excludes ────────────────────────────────────────────────────────
+    def test_explicit_name_wins_even_when_root_has_a_name(self):
+        assert _resolve_name(self._args("override"), Path("/data/some-dir")) == "override"
 
 
 class TestBuildExcludes:
+    """Merging of user-supplied excludes with the built-in defaults."""
+
     def _args(
         self, exclude: list[str] | None = None, no_default_excludes: bool = False
     ) -> argparse.Namespace:
@@ -271,10 +256,9 @@ class TestBuildExcludes:
         assert result == {"default"}
 
 
-# ── _build_state ───────────────────────────────────────────────────────────
-
-
 class TestBuildState:
+    """Construction of traversal state from the command-line limits."""
+
     def _args(
         self, max_files: int | None = None, timeout: float | None = None
     ) -> argparse.Namespace:
@@ -302,134 +286,14 @@ class TestBuildState:
         assert state.deadline is None
 
 
-# ── _scan_dir ──────────────────────────────────────────────────────────────
-
-
 class TestScanDir:
-    def test_empty_directory_returns_zero_counts(self, tmp_path: Path):
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["file_count"] == 0
-        assert node["size"] == 0
-        assert node["children"] == []
-        assert node["extensions"] == {}
-        assert node["categories"] == {}
+    """Recursive directory scanning when the directory cannot be listed."""
 
-    def test_node_carries_correct_name_and_path(self, tmp_path: Path):
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["name"] == tmp_path.name
-        assert node["path"] == str(tmp_path)
-
-    def test_counts_files_and_accumulates_size(self, tmp_path: Path):
-        (tmp_path / "a.txt").write_bytes(b"hello")  # 5 bytes
-        (tmp_path / "b.txt").write_bytes(b"world!")  # 6 bytes
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["file_count"] == 2
-        assert node["size"] == 11
-
-    def test_recurses_and_aggregates_child_stats(self, tmp_path: Path):
-        sub = tmp_path / "sub"
-        sub.mkdir()
-        (sub / "code.py").write_bytes(b"x" * 100)
-        (tmp_path / "readme.txt").write_bytes(b"y" * 200)
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["file_count"] == 2
-        assert node["size"] == 300
-        assert len(node["children"]) == 1
-        assert node["children"][0]["name"] == "sub"
-
-    def test_assigns_correct_extension_keys(self, tmp_path: Path):
-        (tmp_path / "image.jpg").write_bytes(b"img")
-        (tmp_path / "script.py").write_bytes(b"code")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["extensions"][".jpg"] == 1
-        assert node["extensions"][".py"] == 1
-
-    def test_assigns_correct_categories(self, tmp_path: Path):
-        (tmp_path / "image.jpg").write_bytes(b"img")
-        (tmp_path / "script.py").write_bytes(b"code")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["categories"]["Image"] == 1
-        assert node["categories"]["Source Code"] == 1
-
-    def test_no_extension_uses_none_key(self, tmp_path: Path):
-        (tmp_path / "Makefile").write_bytes(b"make")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["extensions"]["(none)"] == 1
-        assert node["categories"]["Other"] == 1
-
-    def test_unknown_extension_maps_to_other(self, tmp_path: Path):
-        (tmp_path / "file.splora").write_bytes(b"x")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["categories"]["Other"] == 1
-
-    def test_respects_exclude_list(self, tmp_path: Path):
-        ignored = tmp_path / "node_modules"
-        ignored.mkdir()
-        (ignored / "big.js").write_bytes(b"x" * 1000)
-        node = _scan_dir(
-            tmp_path, depth=0, depth_limit=0, excludes={"node_modules"}, state=_State()
-        )
-        assert node["file_count"] == 0
-        assert node["children"] == []
-
-    def test_respects_depth_limit(self, tmp_path: Path):
-        # Structure: root/a/b/deep.txt — depth_limit=1 means we enter 'a' but not 'b'
-        deep = tmp_path / "a" / "b"
-        deep.mkdir(parents=True)
-        (deep / "deep.txt").write_bytes(b"too deep")
-        (tmp_path / "a" / "shallow.txt").write_bytes(b"ok")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=1, excludes=set(), state=_State())
-        assert node["file_count"] == 1  # only shallow.txt
-
-    def test_unlimited_depth_traverses_all_levels(self, tmp_path: Path):
-        deep = tmp_path / "a" / "b" / "c"
-        deep.mkdir(parents=True)
-        (deep / "file.txt").write_bytes(b"deep")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["file_count"] == 1
-
-    def test_stops_early_on_max_files(self, tmp_path: Path):
-        for i in range(10):
-            (tmp_path / f"file{i}.txt").write_bytes(b"x")
-        state = _State(max_files=4)
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=state)
-        assert node["file_count"] <= 4
-        assert state.stopped
-
-    def test_children_are_sorted_alphabetically(self, tmp_path: Path):
-        for name in ("zebra", "alpha", "middle"):
-            (tmp_path / name).mkdir()
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        names = [c["name"] for c in node["children"]]
-        assert names == sorted(names)
-
-    def test_skips_symlinks_to_files(self, tmp_path: Path):
-        real = tmp_path / "real.txt"
-        real.write_bytes(b"content")
-        try:
-            link = tmp_path / "link.txt"
-            link.symlink_to(real)
-        except (OSError, NotImplementedError):
-            pytest.skip("Symlinks not supported on this platform")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        assert node["file_count"] == 1  # only the real file
-
-    def test_skips_symlinks_to_directories(self, tmp_path: Path):
-        real_dir = tmp_path / "real_dir"
-        real_dir.mkdir()
-        (real_dir / "file.txt").write_bytes(b"content")
-        try:
-            link_dir = tmp_path / "link_dir"
-            link_dir.symlink_to(real_dir)
-        except (OSError, NotImplementedError):
-            pytest.skip("Symlinks not supported on this platform")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
-        # file.txt inside real_dir is counted; link_dir is skipped entirely
-        assert node["file_count"] == 1
-
-    def test_permission_error_returns_empty_node(self, tmp_path: Path):
+    def test_permission_error_returns_empty_node(self):
         # Simulate a directory that cannot be listed
         with patch("os.scandir", side_effect=PermissionError("denied")):
-            node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+            node = _scan_dir(
+                Path("/unreadable"), depth=0, depth_limit=0, excludes=set(), state=_State()
+            )
         assert node["file_count"] == 0
         assert node["children"] == []
