@@ -87,12 +87,12 @@ pytest
 
 Tests live under [`test/`](test/), split into four folders:
 
-| Folder | Scope |
+| Folder | Purpose |
 |---|---|
-| [`test/lint/`](test/lint/) | Project rules checked by parsing the source; no behaviour is run |
-| [`test/unit/`](test/unit/) | Individual functions in isolation, with no filesystem or process I/O |
-| [`test/integration/`](test/integration/) | Whole commands driven in-process against temporary trees |
-| [`test/end2end/`](test/end2end/) | The full pipeline driven as real subprocesses |
+| [`test/lint/`](test/lint/) | Confirms the codebase follows its own conventions |
+| [`test/unit/`](test/unit/) | Confirms individual functions behave correctly in isolation |
+| [`test/integration/`](test/integration/) | Confirms code integrates correctly with real systems such as the filesystem |
+| [`test/end2end/`](test/end2end/) | Confirms real-world scenarios work correctly as a final safety net |
 
 Useful flags:
 

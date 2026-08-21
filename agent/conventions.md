@@ -69,7 +69,9 @@ The language version is **3.13** — no syntax or APIs that need a newer one or 
 ## Tests
 
 Prefer the existing conventions — `pytest`, `tmp_path`, `monkeypatch` — over new frameworks or
-helpers. A test belongs to the narrowest tier that can express it. Any test doing filesystem
-I/O that is not end-to-end is an integration test. Unit tests stay pure. The end-to-end tier
-can be slow and drives real processes, so it is excluded from the default run and invoked
+helpers. A test belongs to the narrowest tier that can express it. The lint tier parses source
+text and runs no behavior, so it sits outside the filesystem-I/O distinction below. Unit tests
+stay pure — no filesystem or process I/O. A test that touches the filesystem is an integration
+test, unless it drives a real running process or server, which puts it in the end-to-end tier
+instead. The end-to-end tier can be slow, so it is excluded from the default run and invoked
 explicitly.
