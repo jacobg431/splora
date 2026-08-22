@@ -20,7 +20,8 @@ class _Layer:
 # own. Add a module by naming it in its tier; add a tier by inserting a row at the right height.
 _LAYERS: tuple[_Layer, ...] = (
     _Layer("primitives", ("src", "src.outcome", "src.terminal")),
-    _Layer("commands", ("src.boot", "src.explore", "src.report")),
+    _Layer("components", ("src.banner", "src.progress")),
+    _Layer("commands", ("src.boot", "src.explore", "src.frame", "src.report")),
     _Layer("entry point", ("splora",)),
 )
 
