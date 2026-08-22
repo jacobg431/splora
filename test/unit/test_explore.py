@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -19,6 +20,11 @@ from src.explore import (
     _scan_dir,
     _State,
 )
+from src.progress import Progress
+
+
+def _quiet() -> Progress:
+    return Progress(io.StringIO(), use_color=False)
 
 
 class TestSanitize:
@@ -260,7 +266,12 @@ class TestScanDir:
         # Simulate a directory that cannot be listed
         with patch("os.scandir", side_effect=PermissionError("denied")):
             node = _scan_dir(
-                Path("/unreadable"), depth=0, depth_limit=0, excludes=set(), state=_State()
+                Path("/unreadable"),
+                depth=0,
+                depth_limit=0,
+                excludes=set(),
+                state=_State(),
+                progress=_quiet(),
             )
         assert node["file_count"] == 0
         assert node["children"] == []

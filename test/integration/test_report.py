@@ -18,7 +18,9 @@ from src.report import (
     _resolve_json_path,
     report,
 )
+from src.terminal import OutputConfig
 
+_TRIMMED = OutputConfig(trim=True, use_color=False)
 _TEMPLATE_FILES = ("index.html", "style.css", "main.js")
 
 
@@ -88,7 +90,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
-        report(name_args("my-run"))
+        report(name_args("my-run"), _TRIMMED)
 
         out = report_dir / "my-run"
         assert (out / "index.html").exists()
@@ -100,7 +102,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         src_path = _make_fs_json(fs_dir, "my-run")
 
-        report(name_args("my-run"))
+        report(name_args("my-run"), _TRIMMED)
 
         written = (report_dir / "my-run" / "data.json").read_text(encoding="utf-8")
         assert written == src_path.read_text(encoding="utf-8")
@@ -113,7 +115,7 @@ class TestReportCommand:
         time.sleep(0.02)
         _make_fs_json(fs_dir, "second")
 
-        report(name_args())  # no explicit name
+        report(name_args(), _TRIMMED)  # no explicit name
 
         assert (report_dir / "second").exists()
         assert not (report_dir / "first").exists()
@@ -122,14 +124,14 @@ class TestReportCommand:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            report(name_args("does-not-exist"))
+            report(name_args("does-not-exist"), _TRIMMED)
         assert exc.value.code == 1
 
     def test_empty_filesystem_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            report(name_args())
+            report(name_args(), _TRIMMED)
         assert exc.value.code == 1
 
     def test_missing_template_file_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
@@ -138,7 +140,7 @@ class TestReportCommand:
         (template_dir / "style.css").unlink()
 
         with pytest.raises(SystemExit) as exc:
-            report(name_args("my-run"))
+            report(name_args("my-run"), _TRIMMED)
         assert exc.value.code == 1
 
     def test_re_running_updates_existing_report(
@@ -147,7 +149,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
-        report(name_args("my-run"))
+        report(name_args("my-run"), _TRIMMED)
 
         updated_payload = {
             "meta": {"name": "my-run", "partial": False, "total_files": 99, "root": "/new"},
@@ -155,7 +157,7 @@ class TestReportCommand:
         }
         (fs_dir / "my-run.json").write_text(json.dumps(updated_payload), encoding="utf-8")
 
-        report(name_args("my-run"))
+        report(name_args("my-run"), _TRIMMED)
 
         data = load_json(report_dir / "my-run" / "data.json")
         assert data["meta"]["total_files"] == 99
@@ -166,7 +168,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "partial-run", partial=True)
 
-        report(name_args("partial-run"))
+        report(name_args("partial-run"), _TRIMMED)
 
         assert (report_dir / "partial-run" / "data.json").exists()
 
@@ -174,7 +176,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "C_drive")  # stored with sanitized name
 
-        report(name_args("C:drive"))  # user passes unsanitized version
+        report(name_args("C:drive"), _TRIMMED)  # user passes unsanitized version
 
         assert (report_dir / "C_drive").exists()
 
@@ -182,7 +184,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "clean-run")
 
-        report(name_args("clean-run"))
+        report(name_args("clean-run"), _TRIMMED)
 
         top = {p.name for p in (report_dir / "clean-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "data.json"}
@@ -195,14 +197,14 @@ class TestReportCommand:
         (template_dir / "legacy").mkdir()
         (template_dir / "legacy" / "old-widget.js").write_text("// old", encoding="utf-8")
 
-        report(name_args("my-run"))
+        report(name_args("my-run"), _TRIMMED)
         assert (report_dir / "my-run" / "legacy" / "old-widget.js").exists()
 
         shutil.rmtree(template_dir / "legacy")
         (template_dir / "core").mkdir()
         (template_dir / "core" / "widget.js").write_text("// widget", encoding="utf-8")
 
-        report(name_args("my-run"))
+        report(name_args("my-run"), _TRIMMED)
 
         top = {p.name for p in (report_dir / "my-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "core", "data.json"}

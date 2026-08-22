@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import io
 from pathlib import Path
 
 import pytest
 
 import src.explore as explore_mod
 from src.explore import _scan_dir, _State, explore
+from src.progress import Progress
+from src.terminal import OutputConfig
+
+_TRIMMED = OutputConfig(trim=True, use_color=False)
+
+
+def _quiet() -> Progress:
+    return Progress(io.StringIO(), use_color=False)
 
 
 def _args(**kwargs) -> argparse.Namespace:
@@ -50,7 +59,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(scan_dir), name="test-run"))
+        explore(_args(path=str(scan_dir), name="test-run"), _TRIMMED)
 
         data = load_json(out_dir / "test-run.json")
 
@@ -67,7 +76,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path)))  # no explicit name
+        explore(_args(path=str(tmp_path)), _TRIMMED)  # no explicit name
 
         data = load_json(out_dir / f"{tmp_path.name}.json")
         assert data["meta"]["name"] == tmp_path.name
@@ -78,7 +87,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="size-run"))
+        explore(_args(path=str(tmp_path), name="size-run"), _TRIMMED)
 
         data = load_json(out_dir / "size-run.json")
         assert data["meta"]["total_size"] == 1000
@@ -89,7 +98,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="partial-run", max_files=5))
+        explore(_args(path=str(tmp_path), name="partial-run", max_files=5), _TRIMMED)
 
         data = load_json(out_dir / "partial-run.json")
         assert data["meta"]["partial"] is True
@@ -101,7 +110,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="timeout-run", timeout=0.0001))
+        explore(_args(path=str(tmp_path), name="timeout-run", timeout=0.0001), _TRIMMED)
 
         data = load_json(out_dir / "timeout-run.json")
         assert data["meta"]["partial"] is True
@@ -117,7 +126,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="exc-run", exclude=["node_modules"]))
+        explore(_args(path=str(tmp_path), name="exc-run", exclude=["node_modules"]), _TRIMMED)
 
         data = load_json(out_dir / "exc-run.json")
         assert data["meta"]["total_files"] == 1
@@ -135,7 +144,7 @@ class TestExploreCommand:
         out_dir = _patch(monkeypatch, tmp_path)
 
         # depth=2: root(0) → a(1) → b(2) → c is at depth 2 so NOT entered
-        explore(_args(path=str(tmp_path), name="depth-run", depth=2))
+        explore(_args(path=str(tmp_path), name="depth-run", depth=2), _TRIMMED)
 
         data = load_json(out_dir / "depth-run.json")
         assert data["meta"]["total_files"] == 1  # only shallow.txt
@@ -149,7 +158,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="cat-run"))
+        explore(_args(path=str(tmp_path), name="cat-run"), _TRIMMED)
 
         data = load_json(out_dir / "cat-run.json")
         tree = data["tree"]
@@ -165,7 +174,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="atomic-run"))
+        explore(_args(path=str(tmp_path), name="atomic-run"), _TRIMMED)
 
         # The .tmp file should have been renamed away; only the final .json remains
         assert (out_dir / "atomic-run.json").exists()
@@ -179,7 +188,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="agg-run"))
+        explore(_args(path=str(tmp_path), name="agg-run"), _TRIMMED)
 
         data = load_json(out_dir / "agg-run.json")
         assert data["tree"]["size"] == 100
@@ -193,7 +202,9 @@ class TestScanDir:
     """Recursive directory scanning and aggregation of child statistics."""
 
     def test_empty_directory_returns_zero_counts(self, tmp_path: Path):
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["file_count"] == 0
         assert node["size"] == 0
         assert node["children"] == []
@@ -201,14 +212,18 @@ class TestScanDir:
         assert node["categories"] == {}
 
     def test_node_carries_correct_name_and_path(self, tmp_path: Path):
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["name"] == tmp_path.name
         assert node["path"] == str(tmp_path)
 
     def test_counts_files_and_accumulates_size(self, tmp_path: Path):
         (tmp_path / "a.txt").write_bytes(b"hello")  # 5 bytes
         (tmp_path / "b.txt").write_bytes(b"world!")  # 6 bytes
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["file_count"] == 2
         assert node["size"] == 11
 
@@ -217,7 +232,9 @@ class TestScanDir:
         sub.mkdir()
         (sub / "code.py").write_bytes(b"x" * 100)
         (tmp_path / "readme.txt").write_bytes(b"y" * 200)
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["file_count"] == 2
         assert node["size"] == 300
         assert len(node["children"]) == 1
@@ -226,26 +243,34 @@ class TestScanDir:
     def test_assigns_correct_extension_keys(self, tmp_path: Path):
         (tmp_path / "image.jpg").write_bytes(b"img")
         (tmp_path / "script.py").write_bytes(b"code")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["extensions"][".jpg"] == 1
         assert node["extensions"][".py"] == 1
 
     def test_assigns_correct_categories(self, tmp_path: Path):
         (tmp_path / "image.jpg").write_bytes(b"img")
         (tmp_path / "script.py").write_bytes(b"code")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["categories"]["Image"] == 1
         assert node["categories"]["Source Code"] == 1
 
     def test_no_extension_uses_none_key(self, tmp_path: Path):
         (tmp_path / "Makefile").write_bytes(b"make")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["extensions"]["(none)"] == 1
         assert node["categories"]["Other"] == 1
 
     def test_unknown_extension_maps_to_other(self, tmp_path: Path):
         (tmp_path / "file.splora").write_bytes(b"x")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["categories"]["Other"] == 1
 
     def test_respects_exclude_list(self, tmp_path: Path):
@@ -253,7 +278,12 @@ class TestScanDir:
         ignored.mkdir()
         (ignored / "big.js").write_bytes(b"x" * 1000)
         node = _scan_dir(
-            tmp_path, depth=0, depth_limit=0, excludes={"node_modules"}, state=_State()
+            tmp_path,
+            depth=0,
+            depth_limit=0,
+            excludes={"node_modules"},
+            state=_State(),
+            progress=_quiet(),
         )
         assert node["file_count"] == 0
         assert node["children"] == []
@@ -264,28 +294,36 @@ class TestScanDir:
         deep.mkdir(parents=True)
         (deep / "deep.txt").write_bytes(b"too deep")
         (tmp_path / "a" / "shallow.txt").write_bytes(b"ok")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=1, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=1, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["file_count"] == 1  # only shallow.txt
 
     def test_unlimited_depth_traverses_all_levels(self, tmp_path: Path):
         deep = tmp_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
         (deep / "file.txt").write_bytes(b"deep")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["file_count"] == 1
 
     def test_stops_early_on_max_files(self, tmp_path: Path):
         for i in range(10):
             (tmp_path / f"file{i}.txt").write_bytes(b"x")
         state = _State(max_files=4)
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=state)
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=state, progress=_quiet()
+        )
         assert node["file_count"] <= 4
         assert state.stopped
 
     def test_children_are_sorted_alphabetically(self, tmp_path: Path):
         for name in ("zebra", "alpha", "middle"):
             (tmp_path / name).mkdir()
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         names = [c["name"] for c in node["children"]]
         assert names == sorted(names)
 
@@ -297,7 +335,9 @@ class TestScanDir:
             link.symlink_to(real)
         except (OSError, NotImplementedError):
             pytest.skip("Symlinks not supported on this platform")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         assert node["file_count"] == 1  # only the real file
 
     def test_skips_symlinks_to_directories(self, tmp_path: Path):
@@ -309,6 +349,8 @@ class TestScanDir:
             link_dir.symlink_to(real_dir)
         except (OSError, NotImplementedError):
             pytest.skip("Symlinks not supported on this platform")
-        node = _scan_dir(tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State())
+        node = _scan_dir(
+            tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
+        )
         # file.txt inside real_dir is counted; link_dir is skipped entirely
         assert node["file_count"] == 1

@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
+import signal
 import sys
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from types import FrameType
 
-from src.terminal import format_bytes
+from src.outcome import EXIT_ERROR, EXIT_INTERRUPTED, EXIT_OK, EXIT_PARTIAL, NextStep, Outcome
+from src.progress import Progress
+from src.terminal import OutputConfig, format_bytes, notice_line
 
 # ── Extension → category mapping ───────────────────────────────────────────
 
@@ -174,6 +180,31 @@ class _State:
             self.stopped = True
 
 
+@dataclass
+class _Interrupt:
+    """How many times the user has pressed Ctrl+C during a scan."""
+
+    presses: int = 0
+
+
+@contextlib.contextmanager
+def _interruptible(state: _State) -> Iterator[_Interrupt]:
+    """Stop the scan on the first Ctrl+C and raise KeyboardInterrupt on the second."""
+    interrupt = _Interrupt()
+
+    def press(_signum: int, _frame: FrameType | None) -> None:
+        interrupt.presses += 1
+        if interrupt.presses > 1:
+            raise KeyboardInterrupt
+        state.stopped = True
+
+    previous = signal.signal(signal.SIGINT, press)
+    try:
+        yield interrupt
+    finally:
+        signal.signal(signal.SIGINT, previous)
+
+
 # ── Core recursive scanner ──────────────────────────────────────────────────
 
 
@@ -183,6 +214,7 @@ def _scan_dir(
     depth_limit: int,
     excludes: set[str],
     state: _State,
+    progress: Progress,
 ) -> dict:
     node: dict = {
         "name": path.name or str(path),
@@ -231,6 +263,7 @@ def _scan_dir(
             node["extensions"][key] = node["extensions"].get(key, 0) + 1
             node["categories"][cat] = node["categories"].get(cat, 0) + 1
             state.count_file()
+            progress.record(size)
 
         elif is_dir:
             if entry.name in excludes:
@@ -238,7 +271,7 @@ def _scan_dir(
             if depth_limit > 0 and depth >= depth_limit:
                 continue
 
-            child = _scan_dir(Path(entry.path), depth + 1, depth_limit, excludes, state)
+            child = _scan_dir(Path(entry.path), depth + 1, depth_limit, excludes, state, progress)
 
             node["size"] += child["size"]
             node["file_count"] += child["file_count"]
@@ -279,16 +312,16 @@ def _build_state(args: argparse.Namespace) -> _State:
 # ── Public entry point ──────────────────────────────────────────────────────
 
 
-def explore(args: argparse.Namespace) -> None:
+def explore(args: argparse.Namespace, config: OutputConfig) -> Outcome:
     """Traverse a file system and record its structure as JSON."""
     root = Path(args.path).resolve()
 
     if not root.exists():
         print(f"Error: path does not exist: {root}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_ERROR)
     if not root.is_dir():
         print(f"Error: not a directory: {root}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(EXIT_ERROR)
 
     raw_name = _resolve_name(args, root)
     safe_name = _sanitize(raw_name)
@@ -301,11 +334,26 @@ def explore(args: argparse.Namespace) -> None:
     print(f"Exploring : {root}")
     if excludes:
         sample = ", ".join(sorted(excludes)[:5])
-        extra = f" … (+{len(excludes) - 5} more)" if len(excludes) > 5 else ""
+        extra = f" ... (+{len(excludes) - 5} more)" if len(excludes) > 5 else ""
         print(f"Excluding : {sample}{extra}")
 
+    progress = Progress(sys.stderr, use_color=config.use_color)
     t0 = time.monotonic()
-    tree = _scan_dir(root, depth=0, depth_limit=args.depth, excludes=excludes, state=state)
+    try:
+        with _interruptible(state) as interrupt:
+            tree = _scan_dir(
+                root,
+                depth=0,
+                depth_limit=args.depth,
+                excludes=excludes,
+                state=state,
+                progress=progress,
+            )
+    except KeyboardInterrupt:
+        progress.finish()
+        print(notice_line("Aborted.", config=config))
+        return Outcome(code=EXIT_INTERRUPTED)
+    progress.finish()
     elapsed = time.monotonic() - t0
 
     output = {
@@ -326,9 +374,20 @@ def explore(args: argparse.Namespace) -> None:
     tmp_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_path.replace(out_path)
 
-    partial_note = " (partial — limit reached)" if state.stopped else ""
+    if interrupt.presses:
+        partial_note = " (partial -- stopped early)"
+    elif state.stopped:
+        partial_note = " (partial -- limit reached)"
+    else:
+        partial_note = ""
+
     print(f"\nDone{partial_note}.")
     print(f"  Files   : {state.files_visited:,}")
     print(f"  Size    : {format_bytes(tree['size'])}")
     print(f"  Elapsed : {elapsed:.1f}s")
     print(f"  Output  : {out_path}")
+    if interrupt.presses:
+        print(notice_line("Interrupted; the partial scan was saved.", config=config))
+
+    code = EXIT_PARTIAL if state.stopped else EXIT_OK
+    return Outcome(code=code, next_step=NextStep(command="report", name=raw_name))
