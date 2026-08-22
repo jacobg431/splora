@@ -10,6 +10,7 @@ This file is the source of truth, where a rule is also encoded as a check, the c
 - Ask first before creating files outside [`agent/`](.), opening a browser, sending network
   requests, or touching anything outside the repository.
 - Run the tests before reporting a task complete. If they fail and you cannot fix them, say so.
+- A test may not consume the host's resources at scale to make itself work.
 - Encode a convention as a check wherever one can be written.
 
 ### How to recognize a design problem worth escalating

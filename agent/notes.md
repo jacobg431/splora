@@ -9,13 +9,27 @@ Three-step pipeline:
 
 ## Source Structure
 
-- `splora.py` — CLI entrypoint; argparse subcommands wired to `src/explore.py`, `src/report.py`, `src/boot.py`
-- `src/explore.py` — `os.scandir` traversal; `_State` dataclass for limits; CATEGORIES map; atomic JSON write
-- `src/report.py` — copies template + vendor assets into `data/report/<name>/`; injects `data.json`
+Production modules sit in layers, and a module may import only from a strictly lower one. The map
+is enforced by `test/lint/test_imports.py`, which also rejects any module absent from it.
+
+| Layer | Modules |
+|---|---|
+| entry point | `splora.py` |
+| commands | `src/frame.py`, `src/explore.py`, `src/report.py`, `src/boot.py` |
+| components | `src/banner.py`, `src/progress.py` |
+| primitives | `src/terminal.py`, `src/outcome.py` |
+
+- `splora.py` — argparse subcommands plus a shared parent parser carrying `--trim-output` and `--no-color`; builds the `OutputConfig` and hands the chosen command body to the frame
+- `src/frame.py` — banner, then the command body, then the next-step advice; returns the body's exit code. Takes the body as a callable, so it never imports a command module
+- `src/explore.py` — `os.scandir` traversal; `_State` limit tracker; CATEGORIES map; inline SIGINT context manager; atomic JSON write
+- `src/report.py` — assembles the report in a dot-prefixed sibling under `data/report/`, then swaps it into place; injects `data.json`
 - `src/boot.py` — `http.server` on first free port ≥5050; `_QuietHandler` suppresses request logs; `webbrowser.open()`
-- `data/template/` — `index.html`, `style.css`, `script.js` (ECharts treemap UI)
+- `src/banner.py` — the ASCII emblem, wordmark, tagline and version printed once per run
+- `src/progress.py` — the live scan counter, redrawn in place and only when stderr is a terminal
+- `src/terminal.py` — `OutputConfig` and its factory, colour helpers, byte and throughput formatting, the shared notice helper
+- `src/outcome.py` — the exit-code constants and the `Outcome`/`NextStep` contract a command body returns
+- `data/template/` — `index.html`, `style.css`, `main.js` and the ES module tree under `core/`, `widgets/` and `ui/`
 - `data/config/default_excludes.txt` — built-in directory exclude list
-- `vendor/echarts.min.js` — bundled ECharts 5; committed to git for offline use
 
 ## Decided: Tech Stack & Design
 
@@ -106,25 +120,53 @@ Rationale (user): highest payoff for consistency and authenticity is to own the 
 
 ## Implementation Status
 
-All MVP features complete as of 2026-06-28. Frontend overhaul is next (branch: `frontend-overhaul`).
+MVP complete, frontend overhaul complete, terminal UX in progress on branch
+`terminal-ux-improvements`.
 
-- `explore.py` ✓ — fully implemented and tested (85 unit + 10 integration tests)
-- `report.py` ✓ — fully implemented and tested (30 unit + 10 integration tests)
-- `boot.py` ✓ — fully implemented and tested (29 unit + 10 integration tests)
-- E2E suite ✓ — 24 tests in `test/end2end/`; excluded from default `pytest` run
+- 18 lint + 217 unit + 128 integration tests run by default (2 skipped: symlink cases need
+  elevated Windows privileges); 45 end-to-end tests invoked explicitly
 - CI ✓ — `.github/workflows/continuous-integration.yaml`; ubuntu + windows; ruff format check
+
+### Terminal UX
+
+Done: the layered presentation modules above, the two global flags, the live progress line, exit
+codes `0`/`1`/`3`/`130`, graceful interrupt in all three commands, the atomic report build, and
+all-ASCII output.
+
+Deferred, and deliberately not started:
+
+- **End-to-end interrupt tests.** Holding a scan open long enough to signal it needed a fixture
+  writing 100,000 real files, which is not an acceptable cost to impose on the machine running
+  the tests. Any revival must hold the scan open without scaling file creation. Interrupt
+  behaviour is meanwhile covered at the integration tier on every platform, by driving the
+  handler the scan installs. A working synchronisation point was found and is worth reusing:
+  under `PYTHONUNBUFFERED=1` the child flushes its `Exploring :` line before the scan begins.
+- **The second Ctrl+C is nearly unreachable.** The first press makes the scan unwind in
+  microseconds, and the handler is restored before the JSON is serialised and written — measured
+  at 1.22s for a 1.68M-file scan. A second press almost always lands in that window and produces
+  the bare traceback the feature exists to remove. The fix is to extend the interruptible region
+  over the write, capturing the summary wording and exit code before it so a late press cannot
+  contradict what was already serialised.
+- **The report swap loses the old report on a crash.** The swap removes the destination and then
+  renames the staged tree into it. A crash between the two leaves neither, and silently. The fix
+  is to rename the old aside instead, swap in, then delete the one moved aside.
 
 ## Report Folder Structure
 
 ```
 data/report/<safe-name>/
-  index.html       ← copied from data/template/
-  style.css        ← copied from data/template/
-  script.js        ← copied from data/template/
-  data.json        ← the raw JSON from data/filesystem/<name>.json
-  vendor/
-    echarts.min.js ← copied from vendor/
+  index.html   ← copied from data/template/
+  style.css    ← copied from data/template/
+  main.js      ← copied from data/template/
+  data.js      ← copied from data/template/
+  core/        ← copied from data/template/
+  widgets/     ← copied from data/template/
+  ui/          ← copied from data/template/
+  data.json    ← the raw JSON from data/filesystem/<name>.json
 ```
+
+While a report is being built it is assembled in `data/report/.<safe-name>.tmp` and swapped into
+place when complete. `boot` skips dot-prefixed directories so one left behind is never served.
 
 ## File Categories
 

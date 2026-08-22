@@ -101,6 +101,39 @@ def run_cli() -> Callable[..., None]:
 
 
 @pytest.fixture(scope="session")
+def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
+    """Return a helper that runs the CLI and hands back its result whatever the exit code."""
+
+    def attempt(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, "splora.py", *args],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+        )
+
+    return attempt
+
+
+@pytest.fixture
+def scratch_run() -> Callable[[str], str]:
+    """Return a helper naming a run whose artifacts are deleted when the test ends."""
+    names: list[str] = []
+
+    def name(label: str) -> str:
+        run = f"e2e-{label}"
+        names.append(run)
+        return run
+
+    yield name
+
+    for run in names:
+        (_FS_DIR / f"{run}.json").unlink(missing_ok=True)
+        (_FS_DIR / f"{run}.tmp").unlink(missing_ok=True)
+        shutil.rmtree(_REPORT_DIR / run, ignore_errors=True)
+        shutil.rmtree(_REPORT_DIR / f".{run}.tmp", ignore_errors=True)
+
+
+@pytest.fixture(scope="session")
 def e2e_pipeline(tmp_path_factory, run_cli, serve_dir):
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
