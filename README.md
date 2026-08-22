@@ -1,6 +1,6 @@
 # Splora
 
-*see where your disk went*
+**See where your disk went**
 
 Splora is a locally hosted, cross-platform file system data visualization tool.
 
@@ -8,7 +8,23 @@ The tool provides a web-based, interactive drill-down feature representing a fil
 
 ## Installation
 
-Install Splora in editable mode to make the `splora` command available in your terminal:
+Requires Python 3.13 or later.
+
+Start by creating and activating the virtual environment:
+
+```
+python -m venv venv
+```
+
+```
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+```
+
+Then install Splora in editable mode to make the `splora` command available in your terminal:
 
 ```
 pip install -e .

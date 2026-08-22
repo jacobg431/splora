@@ -6,7 +6,7 @@ from itertools import groupby
 
 from src.terminal import ACCENT, ACCENT_DEEP, ACCENT_DIM, ACCENT_LIGHT, MUTED, paint
 
-TAGLINE = "see where your disk went"
+TAGLINE = "See where your disk went"
 
 _PACKAGE = "splora"
 _VERSION_WHEN_NOT_INSTALLED = "0.1.0"

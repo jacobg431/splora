@@ -145,7 +145,7 @@ back to a static value when the package is not installed.
   ..........     ___) ||  __/ | |___ | |_| ||  _ <  / ___ \
   ..........    |____/ |_|    |_____| \___/ |_| \_\/_/   \_\
 
-  see where your disk went  -  v0.1.0
+  See where your disk went  -  v0.1.0
 ```
 
 The tagline is adopted in `README.md` as well, so the terminal and the documentation open with
