@@ -4,20 +4,45 @@ from __future__ import annotations
 
 import argparse
 import io
+import signal
 from pathlib import Path
 
 import pytest
 
 import src.explore as explore_mod
 from src.explore import _scan_dir, _State, explore
+from src.outcome import EXIT_INTERRUPTED, EXIT_OK, EXIT_PARTIAL
 from src.progress import Progress
 from src.terminal import OutputConfig
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
+_DECORATED = OutputConfig(trim=False, use_color=False)
+_REAL_SCAN_DIR = explore_mod._scan_dir
 
 
 def _quiet() -> Progress:
     return Progress(io.StringIO(), use_color=False)
+
+
+def _make_scan_tree(parent: Path) -> Path:
+    """Create a directory of files to scan, kept a sibling of the output directory."""
+    scan = parent / "scan"
+    scan.mkdir()
+    for name in ("a.txt", "b.py", "c.json"):
+        (scan / name).write_bytes(b"x" * 10)
+    return scan
+
+
+def _scan_after_pressing(times: int):
+    """Return a _scan_dir stand-in that first fires the handler the scan installed."""
+
+    def scan(*args, **kwargs):
+        handler = signal.getsignal(signal.SIGINT)
+        for _ in range(times):
+            handler(signal.SIGINT, None)
+        return _REAL_SCAN_DIR(*args, **kwargs)
+
+    return scan
 
 
 def _args(**kwargs) -> argparse.Namespace:
@@ -354,3 +379,121 @@ class TestScanDir:
         )
         # file.txt inside real_dir is counted; link_dir is skipped entirely
         assert node["file_count"] == 1
+
+
+class TestExitCodes:
+    """The code a completed scan reports, and the step it points at next."""
+
+    def test_a_whole_scan_succeeds(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        assert explore(_args(path=str(scan), name="whole"), _TRIMMED).code == EXIT_OK
+
+    def test_stopping_on_max_files_is_partial(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        outcome = explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED)
+        assert outcome.code == EXIT_PARTIAL
+
+    def test_stopping_on_timeout_is_partial(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        outcome = explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED)
+        assert outcome.code == EXIT_PARTIAL
+
+    def test_a_whole_scan_points_at_report(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        outcome = explore(_args(path=str(scan), name="whole"), _TRIMMED)
+        assert outcome.next_step.command == "report"
+
+    def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        outcome = explore(_args(path=str(scan), name="named-run"), _TRIMMED)
+        assert outcome.next_step.name == "named-run"
+
+    def test_a_capped_scan_still_points_at_report(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        outcome = explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED)
+        assert outcome.next_step is not None
+
+    def test_a_capped_scan_says_the_limit_was_reached(self, tmp_path: Path, monkeypatch, capsys):
+        scan = _make_scan_tree(tmp_path)
+        _patch(monkeypatch, tmp_path)
+        explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED)
+        assert "Done (partial -- limit reached)." in capsys.readouterr().out
+
+
+class TestInterrupt:
+    """Ctrl+C during a scan, driven by calling the handler the scan installs."""
+
+    def _interrupted(self, tmp_path, monkeypatch, presses: int, config=_TRIMMED):
+        scan = _make_scan_tree(tmp_path)
+        out_dir = _patch(monkeypatch, tmp_path)
+        monkeypatch.setattr(explore_mod, "_scan_dir", _scan_after_pressing(presses))
+        outcome = explore(_args(path=str(scan), name="stopped"), config)
+        return outcome, out_dir / "stopped.json"
+
+    def test_one_press_reports_a_partial_scan(self, tmp_path: Path, monkeypatch):
+        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert outcome.code == EXIT_PARTIAL
+
+    def test_one_press_writes_the_output(self, tmp_path: Path, monkeypatch):
+        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert json_path.exists()
+
+    def test_one_press_flags_the_output_partial(self, tmp_path: Path, monkeypatch, load_json):
+        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert load_json(json_path)["meta"]["partial"] is True
+
+    def test_one_press_still_points_at_report(self, tmp_path: Path, monkeypatch):
+        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert outcome.next_step.command == "report"
+
+    def test_one_press_says_the_scan_stopped_early(self, tmp_path: Path, monkeypatch, capsys):
+        self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert "Done (partial -- stopped early)." in capsys.readouterr().out
+
+    def test_one_press_reports_the_interruption(self, tmp_path: Path, monkeypatch, capsys):
+        self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert "Interrupted" in capsys.readouterr().out
+
+    def test_two_presses_abort(self, tmp_path: Path, monkeypatch):
+        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert outcome.code == EXIT_INTERRUPTED
+
+    def test_two_presses_write_nothing(self, tmp_path: Path, monkeypatch):
+        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert not json_path.exists()
+
+    def test_two_presses_leave_no_partial_file_behind(self, tmp_path: Path, monkeypatch):
+        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert list(json_path.parent.glob("*.tmp")) == []
+
+    def test_two_presses_offer_no_next_step(self, tmp_path: Path, monkeypatch):
+        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert outcome.next_step is None
+
+    def test_two_presses_say_it_was_aborted(self, tmp_path: Path, monkeypatch, capsys):
+        self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert "Aborted." in capsys.readouterr().out
+
+    def test_the_trimmed_notice_is_the_bare_message(self, tmp_path: Path, monkeypatch, capsys):
+        self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert capsys.readouterr().out.splitlines()[-1] == "Aborted."
+
+    def test_the_decorated_notice_carries_a_glyph(self, tmp_path: Path, monkeypatch, capsys):
+        self._interrupted(tmp_path, monkeypatch, presses=2, config=_DECORATED)
+        assert capsys.readouterr().out.splitlines()[-1] == "! Aborted."
+
+    def test_the_previous_handler_is_restored(self, tmp_path: Path, monkeypatch):
+        before = signal.getsignal(signal.SIGINT)
+        self._interrupted(tmp_path, monkeypatch, presses=1)
+        assert signal.getsignal(signal.SIGINT) is before
+
+    def test_the_previous_handler_is_restored_after_an_abort(self, tmp_path: Path, monkeypatch):
+        before = signal.getsignal(signal.SIGINT)
+        self._interrupted(tmp_path, monkeypatch, presses=2)
+        assert signal.getsignal(signal.SIGINT) is before

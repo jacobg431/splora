@@ -14,6 +14,7 @@ _SERVED_DIR = Path("/reports/my-run")
 
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
+_DECORATED = OutputConfig(trim=False, use_color=False)
 
 
 class TestSanitize:
@@ -122,6 +123,20 @@ class TestServe:
             with patch("src.boot.webbrowser.open"):
                 # Should NOT propagate KeyboardInterrupt to the caller
                 _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=False)
+
+    def test_stopping_says_so(self, capsys):
+        httpd = self._make_httpd_mock()
+        with patch("src.boot.http.server.HTTPServer", return_value=httpd):
+            with patch("src.boot.webbrowser.open"):
+                _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=False)
+        assert capsys.readouterr().out.splitlines()[-1] == "Stopped."
+
+    def test_the_decorated_stop_notice_carries_a_glyph(self, capsys):
+        httpd = self._make_httpd_mock()
+        with patch("src.boot.http.server.HTTPServer", return_value=httpd):
+            with patch("src.boot.webbrowser.open"):
+                _serve(_SERVED_DIR, 5050, config=_DECORATED, open_browser=False)
+        assert capsys.readouterr().out.splitlines()[-1] == "! Stopped."
 
     def test_url_is_constructed_from_port(self):
         httpd = self._make_httpd_mock()

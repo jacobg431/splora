@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 from unittest.mock import patch
@@ -9,10 +10,14 @@ from unittest.mock import patch
 import pytest
 
 import src.boot as boot_mod
-from src.boot import _latest_report, _resolve_report_dir, boot
+from src.boot import _finished_reports, _latest_report, _resolve_report_dir, boot
 from src.terminal import OutputConfig
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
+
+
+def _set_mtime(path: Path, when: float) -> None:
+    os.utime(path, (when, when))
 
 
 def _patch(monkeypatch, tmp_path: Path) -> Path:
@@ -167,4 +172,54 @@ class TestResolveReportDir:
     def test_no_name_nonexistent_report_dir_exits_with_code_1(self, tmp_path: Path):
         with pytest.raises(SystemExit) as exc:
             _resolve_report_dir(None, tmp_path / "missing")
+        assert exc.value.code == 1
+
+
+class TestStagingDirectoriesAreIgnored:
+    """A report still being staged must never be mistaken for one ready to serve."""
+
+    def test_finished_reports_excludes_a_staging_directory(self, tmp_path: Path):
+        (tmp_path / "run-a").mkdir()
+        (tmp_path / ".run-a.tmp").mkdir()
+        assert _finished_reports(tmp_path) == [tmp_path / "run-a"]
+
+    def test_finished_reports_excludes_files(self, tmp_path: Path):
+        (tmp_path / "run-a").mkdir()
+        (tmp_path / "stray.json").write_text("{}", encoding="utf-8")
+        assert _finished_reports(tmp_path) == [tmp_path / "run-a"]
+
+    def test_finished_reports_is_empty_when_only_staging_remains(self, tmp_path: Path):
+        (tmp_path / ".run-a.tmp").mkdir()
+        assert _finished_reports(tmp_path) == []
+
+    def test_a_newer_staging_directory_is_not_chosen_as_the_latest(self, tmp_path: Path):
+        finished = tmp_path / "run-a"
+        finished.mkdir()
+        staging = tmp_path / ".run-a.tmp"
+        staging.mkdir()
+        _set_mtime(finished, 1_000_000)
+        _set_mtime(staging, 2_000_000)
+        assert _latest_report(tmp_path) == finished
+
+    def test_only_staging_directories_resolve_to_nothing(self, tmp_path: Path):
+        (tmp_path / ".run-a.tmp").mkdir()
+        assert _latest_report(tmp_path) is None
+
+    def test_resolving_without_a_name_skips_a_newer_staging_directory(
+        self, tmp_path: Path, monkeypatch
+    ):
+        report_dir = _patch(monkeypatch, tmp_path)
+        finished = report_dir / "run-a"
+        finished.mkdir()
+        staging = report_dir / ".run-a.tmp"
+        staging.mkdir()
+        _set_mtime(finished, 1_000_000)
+        _set_mtime(staging, 2_000_000)
+        assert _resolve_report_dir(None, report_dir) == finished
+
+    def test_a_staging_directory_alone_leaves_nothing_to_serve(self, tmp_path: Path, monkeypatch):
+        report_dir = _patch(monkeypatch, tmp_path)
+        (report_dir / ".run-a.tmp").mkdir()
+        with pytest.raises(SystemExit) as exc:
+            _resolve_report_dir(None, report_dir)
         assert exc.value.code == 1
