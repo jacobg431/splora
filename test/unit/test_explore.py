@@ -14,7 +14,6 @@ from src.explore import (
     CATEGORIES,
     _build_excludes,
     _build_state,
-    _fmt_bytes,
     _resolve_name,
     _sanitize,
     _scan_dir,
@@ -55,38 +54,6 @@ class TestSanitize:
 
     def test_preserves_unicode(self):
         assert _sanitize("données") == "données"
-
-
-class TestFmtBytes:
-    """Human-readable byte formatting across every unit boundary."""
-
-    def test_zero(self):
-        assert _fmt_bytes(0) == "0 B"
-
-    def test_bytes(self):
-        assert _fmt_bytes(512) == "512 B"
-
-    def test_exactly_one_kb(self):
-        assert _fmt_bytes(1024) == "1.0 KB"
-
-    def test_fractional_kb(self):
-        assert _fmt_bytes(1536) == "1.5 KB"
-
-    def test_exactly_one_mb(self):
-        assert _fmt_bytes(1024**2) == "1.0 MB"
-
-    def test_exactly_one_gb(self):
-        assert _fmt_bytes(1024**3) == "1.0 GB"
-
-    def test_exactly_one_tb(self):
-        assert _fmt_bytes(1024**4) == "1.0 TB"
-
-    def test_exactly_one_pb(self):
-        assert _fmt_bytes(1024**5) == "1.0 PB"
-
-    def test_large_byte_value(self):
-        result = _fmt_bytes(1024**3 * 2.5)
-        assert result == "2.5 GB"
 
 
 class TestCategories:

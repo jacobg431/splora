@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.terminal import format_bytes
+
 # ── Extension → category mapping ───────────────────────────────────────────
 
 CATEGORIES: dict[str, str] = {
@@ -142,14 +144,6 @@ def _load_default_excludes() -> set[str]:
     except OSError:
         return set()
     return {ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("#")}
-
-
-def _fmt_bytes(n: float) -> str:
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if n < 1024:
-            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
-        n /= 1024
-    return f"{n:.1f} PB"
 
 
 # ── Traversal state ─────────────────────────────────────────────────────────
@@ -335,6 +329,6 @@ def explore(args: argparse.Namespace) -> None:
     partial_note = " (partial — limit reached)" if state.stopped else ""
     print(f"\nDone{partial_note}.")
     print(f"  Files   : {state.files_visited:,}")
-    print(f"  Size    : {_fmt_bytes(tree['size'])}")
+    print(f"  Size    : {format_bytes(tree['size'])}")
     print(f"  Elapsed : {elapsed:.1f}s")
     print(f"  Output  : {out_path}")
