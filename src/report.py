@@ -5,9 +5,11 @@ import json
 import re
 import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
-from src.outcome import EXIT_ERROR, EXIT_INTERRUPTED, EXIT_OK, NextStep, Outcome
+from src.command import Abandon, Cancel, Command, Interrupt
+from src.outcome import EXIT_ERROR, EXIT_OK, NextStep, Outcome
 from src.terminal import OutputConfig, notice_line
 
 _REPO_ROOT = Path(__file__).parent.parent
@@ -72,7 +74,12 @@ def _staging_dir(out_dir: Path) -> Path:
     return out_dir.parent / f"{_STAGING_PREFIX}{out_dir.name}{_STAGING_SUFFIX}"
 
 
-def _build_report(out_dir: Path, template_dir: Path, raw_json: str) -> None:
+def _build_report(
+    out_dir: Path,
+    template_dir: Path,
+    raw_json: str,
+    on_swap: Callable[[], None] | None = None,
+) -> None:
     """Assemble the report beside its destination and swap it in once it is complete."""
     staging = _staging_dir(out_dir)
     try:
@@ -80,6 +87,8 @@ def _build_report(out_dir: Path, template_dir: Path, raw_json: str) -> None:
             shutil.rmtree(staging)
         shutil.copytree(template_dir, staging)
         (staging / "data.json").write_text(raw_json, encoding="utf-8")
+        if on_swap is not None:
+            on_swap()
         if out_dir.exists():
             shutil.rmtree(out_dir)
         staging.replace(out_dir)
@@ -88,30 +97,56 @@ def _build_report(out_dir: Path, template_dir: Path, raw_json: str) -> None:
             shutil.rmtree(staging)
 
 
-def report(args: argparse.Namespace, config: OutputConfig) -> Outcome:
-    """Generate an HTML report from a recorded exploration run."""
-    json_path = _resolve_json_path(args.name, _FS_DIR)
-    raw, data = _read_json(json_path)
-    meta = data.get("meta", {})
+class Report(Command):
+    """The command that turns a recorded exploration run into an HTML report."""
 
-    missing = _missing_assets(_TEMPLATE_DIR)
-    if missing:
-        print(f"Error: missing asset(s): {', '.join(missing)}", file=sys.stderr)
-        sys.exit(EXIT_ERROR)
+    def __init__(self, args: argparse.Namespace, config: OutputConfig) -> None:
+        self._args = args
+        self._config = config
+        self._swapping = False
+        self._interrupted_while_swapping = False
 
-    out_dir = _REPORT_DIR / json_path.stem
-    existed = out_dir.exists()
-    try:
-        _build_report(out_dir, _TEMPLATE_DIR, raw)
-    except KeyboardInterrupt:
-        print(notice_line("Canceled.", config=config))
-        return Outcome(code=EXIT_INTERRUPTED)
+    def run(self) -> Outcome:
+        """Generate an HTML report from a recorded exploration run."""
+        json_path = _resolve_json_path(self._args.name, _FS_DIR)
+        raw, data = _read_json(json_path)
+        meta = data.get("meta", {})
 
-    verb = "Updated" if existed else "Generated"
-    print(f"{verb}   : {meta.get('name', json_path.stem)}")
-    if meta.get("partial"):
-        print("Warning   : Partial scan -- some files were not visited during explore.")
-    print(f"  Root    : {meta.get('root', '?')}")
-    print(f"  Files   : {meta.get('total_files', '?'):,}")
-    print(f"  Output  : {out_dir}")
-    return Outcome(code=EXIT_OK, next_step=NextStep(command="boot", name=json_path.stem))
+        missing = _missing_assets(_TEMPLATE_DIR)
+        if missing:
+            print(f"Error: missing asset(s): {', '.join(missing)}", file=sys.stderr)
+            sys.exit(EXIT_ERROR)
+
+        out_dir = _REPORT_DIR / json_path.stem
+        existed = out_dir.exists()
+        _build_report(out_dir, _TEMPLATE_DIR, raw, on_swap=self._entering_swap)
+        self._swapping = False
+
+        verb = "Updated" if existed else "Generated"
+        print(f"{verb}   : {meta.get('name', json_path.stem)}")
+        if meta.get("partial"):
+            print("Warning   : Partial scan -- some files were not visited during explore.")
+        print(f"  Root    : {meta.get('root', '?')}")
+        print(f"  Files   : {meta.get('total_files', '?'):,}")
+        print(f"  Output  : {out_dir}")
+        if self._interrupted_while_swapping:
+            print(notice_line("The report was already complete; it was kept.", config=self._config))
+        return Outcome(code=EXIT_OK, next_step=NextStep(command="boot", name=json_path.stem))
+
+    def cancel(self) -> None:
+        """Abandon the build, leaving any previous report untouched."""
+        self._stop(Cancel)
+
+    def abandon(self) -> None:
+        """Abandon the build, leaving any previous report untouched."""
+        self._stop(Abandon)
+
+    def _entering_swap(self) -> None:
+        self._swapping = True
+
+    def _stop(self, interrupt: type[Interrupt]) -> None:
+        if self._swapping:
+            self._interrupted_while_swapping = True
+            return
+        print(notice_line("Canceled.", config=self._config))
+        raise interrupt

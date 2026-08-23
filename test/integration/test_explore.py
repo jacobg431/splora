@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import argparse
 import io
-import signal
+import json
 from pathlib import Path
 
 import pytest
 
 import src.explore as explore_mod
-from src.explore import _scan_dir, _State, explore
-from src.outcome import EXIT_INTERRUPTED, EXIT_OK, EXIT_PARTIAL
+from src.command import Abandon
+from src.explore import Explore, _scan_dir, _State
+from src.outcome import EXIT_OK, EXIT_PARTIAL
 from src.progress import Progress
 from src.terminal import OutputConfig
 
@@ -33,16 +34,37 @@ def _make_scan_tree(parent: Path) -> Path:
     return scan
 
 
-def _scan_after_pressing(times: int):
-    """Return a _scan_dir stand-in that first fires the handler the scan installed."""
+def _scan_calling(*responses):
+    """Return a _scan_dir stand-in that invokes the given responses before it scans."""
 
     def scan(*args, **kwargs):
-        handler = signal.getsignal(signal.SIGINT)
-        for _ in range(times):
-            handler(signal.SIGINT, None)
+        for respond in responses:
+            respond()
         return _REAL_SCAN_DIR(*args, **kwargs)
 
     return scan
+
+
+def _replace_calling(respond):
+    """Return a Path.replace stand-in that invokes a response instead of renaming."""
+
+    def replace(_self, _target):
+        respond()
+
+    return replace
+
+
+class _JsonCalling:
+    """A stand-in for the json module that invokes a response before it serialises."""
+
+    def __init__(self, *responses):
+        self._responses = responses
+
+    def dumps(self, *args, **kwargs):
+        """Invoke every response, then serialise exactly as the real module would."""
+        for respond in self._responses:
+            respond()
+        return json.dumps(*args, **kwargs)
 
 
 def _args(**kwargs) -> argparse.Namespace:
@@ -84,7 +106,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(scan_dir), name="test-run"), _TRIMMED)
+        Explore(_args(path=str(scan_dir), name="test-run"), _TRIMMED).run()
 
         data = load_json(out_dir / "test-run.json")
 
@@ -101,7 +123,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path)), _TRIMMED)  # no explicit name
+        Explore(_args(path=str(tmp_path)), _TRIMMED).run()  # no explicit name
 
         data = load_json(out_dir / f"{tmp_path.name}.json")
         assert data["meta"]["name"] == tmp_path.name
@@ -112,7 +134,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="size-run"), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="size-run"), _TRIMMED).run()
 
         data = load_json(out_dir / "size-run.json")
         assert data["meta"]["total_size"] == 1000
@@ -123,7 +145,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="partial-run", max_files=5), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="partial-run", max_files=5), _TRIMMED).run()
 
         data = load_json(out_dir / "partial-run.json")
         assert data["meta"]["partial"] is True
@@ -135,7 +157,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="timeout-run", timeout=0.0001), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="timeout-run", timeout=0.0001), _TRIMMED).run()
 
         data = load_json(out_dir / "timeout-run.json")
         assert data["meta"]["partial"] is True
@@ -151,7 +173,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="exc-run", exclude=["node_modules"]), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="exc-run", exclude=["node_modules"]), _TRIMMED).run()
 
         data = load_json(out_dir / "exc-run.json")
         assert data["meta"]["total_files"] == 1
@@ -169,7 +191,7 @@ class TestExploreCommand:
         out_dir = _patch(monkeypatch, tmp_path)
 
         # depth=2: root(0) → a(1) → b(2) → c is at depth 2 so NOT entered
-        explore(_args(path=str(tmp_path), name="depth-run", depth=2), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="depth-run", depth=2), _TRIMMED).run()
 
         data = load_json(out_dir / "depth-run.json")
         assert data["meta"]["total_files"] == 1  # only shallow.txt
@@ -183,7 +205,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="cat-run"), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="cat-run"), _TRIMMED).run()
 
         data = load_json(out_dir / "cat-run.json")
         tree = data["tree"]
@@ -199,7 +221,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="atomic-run"), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="atomic-run"), _TRIMMED).run()
 
         # The .tmp file should have been renamed away; only the final .json remains
         assert (out_dir / "atomic-run.json").exists()
@@ -213,7 +235,7 @@ class TestExploreCommand:
 
         out_dir = _patch(monkeypatch, tmp_path)
 
-        explore(_args(path=str(tmp_path), name="agg-run"), _TRIMMED)
+        Explore(_args(path=str(tmp_path), name="agg-run"), _TRIMMED).run()
 
         data = load_json(out_dir / "agg-run.json")
         assert data["tree"]["size"] == 100
@@ -387,113 +409,175 @@ class TestExitCodes:
     def test_a_whole_scan_succeeds(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        assert explore(_args(path=str(scan), name="whole"), _TRIMMED).code == EXIT_OK
+        assert Explore(_args(path=str(scan), name="whole"), _TRIMMED).run().code == EXIT_OK
 
     def test_stopping_on_max_files_is_partial(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        outcome = explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED)
+        outcome = Explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED).run()
         assert outcome.code == EXIT_PARTIAL
 
     def test_stopping_on_timeout_is_partial(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        outcome = explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED)
+        outcome = Explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED).run()
         assert outcome.code == EXIT_PARTIAL
 
     def test_a_whole_scan_points_at_report(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        outcome = explore(_args(path=str(scan), name="whole"), _TRIMMED)
+        outcome = Explore(_args(path=str(scan), name="whole"), _TRIMMED).run()
         assert outcome.next_step.command == "report"
 
     def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        outcome = explore(_args(path=str(scan), name="named-run"), _TRIMMED)
+        outcome = Explore(_args(path=str(scan), name="named-run"), _TRIMMED).run()
         assert outcome.next_step.name == "named-run"
 
     def test_a_capped_scan_still_points_at_report(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        outcome = explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED)
+        outcome = Explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED).run()
         assert outcome.next_step is not None
 
     def test_a_capped_scan_says_the_limit_was_reached(self, tmp_path: Path, monkeypatch, capsys):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED)
+        Explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED).run()
         assert "Done (partial -- limit reached)." in capsys.readouterr().out
 
 
-class TestInterrupt:
-    """Ctrl+C during a scan, driven by calling the handler the scan installs."""
+class TestCancelledScan:
+    """A first Ctrl+C, which stops the scan and keeps what it has already found."""
 
-    def _interrupted(self, tmp_path, monkeypatch, presses: int, config=_TRIMMED):
+    def _cancelled(self, tmp_path, monkeypatch, config=_TRIMMED):
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
-        monkeypatch.setattr(explore_mod, "_scan_dir", _scan_after_pressing(presses))
-        outcome = explore(_args(path=str(scan), name="stopped"), config)
-        return outcome, out_dir / "stopped.json"
+        command = Explore(_args(path=str(scan), name="stopped"), config)
+        monkeypatch.setattr(explore_mod, "_scan_dir", _scan_calling(command.cancel))
+        return command.run(), out_dir / "stopped.json"
 
-    def test_one_press_reports_a_partial_scan(self, tmp_path: Path, monkeypatch):
-        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=1)
+    def test_it_reports_a_partial_scan(self, tmp_path: Path, monkeypatch):
+        outcome, _ = self._cancelled(tmp_path, monkeypatch)
         assert outcome.code == EXIT_PARTIAL
 
-    def test_one_press_writes_the_output(self, tmp_path: Path, monkeypatch):
-        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=1)
+    def test_it_writes_the_output(self, tmp_path: Path, monkeypatch):
+        _, json_path = self._cancelled(tmp_path, monkeypatch)
         assert json_path.exists()
 
-    def test_one_press_flags_the_output_partial(self, tmp_path: Path, monkeypatch, load_json):
-        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=1)
+    def test_it_flags_the_output_partial(self, tmp_path: Path, monkeypatch, load_json):
+        _, json_path = self._cancelled(tmp_path, monkeypatch)
         assert load_json(json_path)["meta"]["partial"] is True
 
-    def test_one_press_still_points_at_report(self, tmp_path: Path, monkeypatch):
-        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=1)
+    def test_it_still_points_at_report(self, tmp_path: Path, monkeypatch):
+        outcome, _ = self._cancelled(tmp_path, monkeypatch)
         assert outcome.next_step.command == "report"
 
-    def test_one_press_says_the_scan_stopped_early(self, tmp_path: Path, monkeypatch, capsys):
-        self._interrupted(tmp_path, monkeypatch, presses=1)
+    def test_it_says_the_scan_stopped_early(self, tmp_path: Path, monkeypatch, capsys):
+        self._cancelled(tmp_path, monkeypatch)
         assert "Done (partial -- stopped early)." in capsys.readouterr().out
 
-    def test_one_press_reports_the_interruption(self, tmp_path: Path, monkeypatch, capsys):
-        self._interrupted(tmp_path, monkeypatch, presses=1)
-        assert "Interrupted" in capsys.readouterr().out
+    def test_it_promises_the_partial_will_be_saved(self, tmp_path: Path, monkeypatch, capsys):
+        self._cancelled(tmp_path, monkeypatch)
+        assert "the partial scan will be saved" in capsys.readouterr().out
 
-    def test_two_presses_abort(self, tmp_path: Path, monkeypatch):
-        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert outcome.code == EXIT_INTERRUPTED
-
-    def test_two_presses_write_nothing(self, tmp_path: Path, monkeypatch):
-        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert not json_path.exists()
-
-    def test_two_presses_leave_no_partial_file_behind(self, tmp_path: Path, monkeypatch):
-        _, json_path = self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert list(json_path.parent.glob("*.tmp")) == []
-
-    def test_two_presses_offer_no_next_step(self, tmp_path: Path, monkeypatch):
-        outcome, _ = self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert outcome.next_step is None
-
-    def test_two_presses_say_it_was_aborted(self, tmp_path: Path, monkeypatch, capsys):
-        self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert "Aborted." in capsys.readouterr().out
-
-    def test_the_trimmed_notice_is_the_bare_message(self, tmp_path: Path, monkeypatch, capsys):
-        self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert capsys.readouterr().out.splitlines()[-1] == "Aborted."
+    def test_it_names_what_a_further_press_would_do(self, tmp_path: Path, monkeypatch, capsys):
+        self._cancelled(tmp_path, monkeypatch)
+        assert "Press Ctrl+C again to discard it." in capsys.readouterr().out
 
     def test_the_decorated_notice_carries_a_glyph(self, tmp_path: Path, monkeypatch, capsys):
-        self._interrupted(tmp_path, monkeypatch, presses=2, config=_DECORATED)
-        assert capsys.readouterr().out.splitlines()[-1] == "! Aborted."
+        self._cancelled(tmp_path, monkeypatch, config=_DECORATED)
+        assert "! Stopping;" in capsys.readouterr().out
 
-    def test_the_previous_handler_is_restored(self, tmp_path: Path, monkeypatch):
-        before = signal.getsignal(signal.SIGINT)
-        self._interrupted(tmp_path, monkeypatch, presses=1)
-        assert signal.getsignal(signal.SIGINT) is before
 
-    def test_the_previous_handler_is_restored_after_an_abort(self, tmp_path: Path, monkeypatch):
-        before = signal.getsignal(signal.SIGINT)
-        self._interrupted(tmp_path, monkeypatch, presses=2)
-        assert signal.getsignal(signal.SIGINT) is before
+class TestInterruptedCommit:
+    """A Ctrl+C arriving once the scan is over, while its result is being written."""
+
+    def _pressed(self, tmp_path, monkeypatch, *responses, config=_TRIMMED):
+        scan = _make_scan_tree(tmp_path)
+        out_dir = _patch(monkeypatch, tmp_path)
+        command = Explore(_args(path=str(scan), name="saved"), config)
+        monkeypatch.setattr(
+            explore_mod, "json", _JsonCalling(*(getattr(command, name) for name in responses))
+        )
+        return command, out_dir / "saved.json"
+
+    def test_a_cancel_lets_the_write_finish(self, tmp_path: Path, monkeypatch, load_json):
+        command, json_path = self._pressed(tmp_path, monkeypatch, "cancel")
+        command.run()
+        assert load_json(json_path)["meta"]["total_files"] == 3
+
+    def test_a_cancel_leaves_the_run_successful(self, tmp_path: Path, monkeypatch):
+        command, _ = self._pressed(tmp_path, monkeypatch, "cancel")
+        assert command.run().code == EXIT_OK
+
+    def test_a_cancel_does_not_mark_the_scan_partial(
+        self, tmp_path: Path, monkeypatch, load_json, capsys
+    ):
+        command, json_path = self._pressed(tmp_path, monkeypatch, "cancel")
+        command.run()
+        assert load_json(json_path)["meta"]["partial"] is False
+        assert "Done." in capsys.readouterr().out
+
+    def test_a_cancel_says_the_scan_is_being_saved(self, tmp_path: Path, monkeypatch, capsys):
+        command, _ = self._pressed(tmp_path, monkeypatch, "cancel")
+        command.run()
+        assert "Saving the scan; press Ctrl+C again to discard it." in capsys.readouterr().out
+
+    def test_an_abandon_discards_the_write(self, tmp_path: Path, monkeypatch):
+        command, json_path = self._pressed(tmp_path, monkeypatch, "abandon")
+        with pytest.raises(Abandon):
+            command.run()
+        assert not json_path.exists()
+
+    def test_an_abandon_leaves_no_partial_file_behind(self, tmp_path: Path, monkeypatch):
+        command, json_path = self._pressed(tmp_path, monkeypatch, "abandon")
+        with pytest.raises(Abandon):
+            command.run()
+        assert list(json_path.parent.glob("*.tmp")) == []
+
+    def test_an_abandon_after_the_write_removes_the_temp_file(self, tmp_path: Path, monkeypatch):
+        scan = _make_scan_tree(tmp_path)
+        out_dir = _patch(monkeypatch, tmp_path)
+        command = Explore(_args(path=str(scan), name="saved"), _TRIMMED)
+        monkeypatch.setattr(Path, "replace", _replace_calling(command.abandon))
+        with pytest.raises(Abandon):
+            command.run()
+        assert list(out_dir.glob("*.tmp")) == []
+        assert not (out_dir / "saved.json").exists()
+
+
+class TestAbandonedScan:
+    """A second Ctrl+C, which discards the scan outright."""
+
+    def _abandoned(self, tmp_path, monkeypatch, config=_TRIMMED):
+        scan = _make_scan_tree(tmp_path)
+        out_dir = _patch(monkeypatch, tmp_path)
+        command = Explore(_args(path=str(scan), name="stopped"), config)
+        monkeypatch.setattr(
+            explore_mod, "_scan_dir", _scan_calling(command.cancel, command.abandon)
+        )
+        with pytest.raises(Abandon):
+            command.run()
+        return out_dir / "stopped.json"
+
+    def test_it_writes_nothing(self, tmp_path: Path, monkeypatch):
+        json_path = self._abandoned(tmp_path, monkeypatch)
+        assert not json_path.exists()
+
+    def test_it_leaves_no_partial_file_behind(self, tmp_path: Path, monkeypatch):
+        json_path = self._abandoned(tmp_path, monkeypatch)
+        assert list(json_path.parent.glob("*.tmp")) == []
+
+    def test_it_says_the_scan_was_discarded(self, tmp_path: Path, monkeypatch, capsys):
+        self._abandoned(tmp_path, monkeypatch)
+        assert "Discarded; no scan was saved." in capsys.readouterr().out
+
+    def test_the_trimmed_notice_is_the_bare_message(self, tmp_path: Path, monkeypatch, capsys):
+        self._abandoned(tmp_path, monkeypatch)
+        assert capsys.readouterr().out.splitlines()[-1] == "Discarded; no scan was saved."
+
+    def test_the_decorated_notice_carries_a_glyph(self, tmp_path: Path, monkeypatch, capsys):
+        self._abandoned(tmp_path, monkeypatch, config=_DECORATED)
+        assert capsys.readouterr().out.splitlines()[-1] == "! Discarded; no scan was saved."

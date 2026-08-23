@@ -1,13 +1,13 @@
 import argparse
-import functools
 
-from src.boot import boot
-from src.explore import explore
+from src.boot import Boot
+from src.command import Command
+from src.explore import Explore
 from src.frame import run
-from src.report import report
+from src.report import Report
 from src.terminal import output_config
 
-_COMMANDS = {"explore": explore, "report": report, "boot": boot}
+_COMMANDS: dict[str, type[Command]] = {"explore": Explore, "report": Report, "boot": Boot}
 
 
 def _global_flags() -> argparse.ArgumentParser:
@@ -83,8 +83,7 @@ def main() -> int:
 
     args = parser.parse_args()
     config = output_config(args)
-    body = functools.partial(_COMMANDS[args.command], args, config)
-    return run(body, config)
+    return run(_COMMANDS[args.command](args, config), config)
 
 
 if __name__ == "__main__":

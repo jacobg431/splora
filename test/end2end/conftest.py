@@ -22,14 +22,10 @@ import pytest
 from src.boot import _find_free_port, _serve
 from src.explore import _FS_DIR
 from src.report import _REPORT_DIR
-from src.terminal import OutputConfig
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RUN_NAME = "splora-e2e"
 _PORT_START = 15000
-
-
-_TRIMMED = OutputConfig(trim=True, use_color=False)
 
 
 @dataclass(frozen=True)
@@ -63,7 +59,6 @@ def serve_dir() -> Callable[..., _Server]:
             kwargs={
                 "report_dir": report_dir,
                 "port": port,
-                "config": _TRIMMED,
                 "open_browser": False,
             },
             daemon=True,

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.boot import _find_free_port, _sanitize, _serve
+from src.boot import Boot, _find_free_port, _sanitize, _serve
+from src.command import Abandon, Cancel
 from src.terminal import OutputConfig
 
 _SERVED_DIR = Path("/reports/my-run")
@@ -15,6 +17,10 @@ _SERVED_DIR = Path("/reports/my-run")
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
 _DECORATED = OutputConfig(trim=False, use_color=False)
+
+
+def _boot(config: OutputConfig) -> Boot:
+    return Boot(argparse.Namespace(name=None), config)
 
 
 class TestSanitize:
@@ -79,68 +85,81 @@ class TestFindFreePort:
 
 
 class TestServe:
-    """Server startup, browser launch, and interrupt handling."""
+    """Server startup and browser launch."""
 
     def _make_httpd_mock(self):
-        """Build a mock HTTPServer that raises KeyboardInterrupt on serve_forever."""
+        """Build a mock HTTPServer whose serve_forever returns instead of blocking."""
         httpd = MagicMock()
         httpd.__enter__ = MagicMock(return_value=httpd)
         httpd.__exit__ = MagicMock(return_value=False)
-        httpd.serve_forever.side_effect = KeyboardInterrupt
         return httpd
 
     def test_opens_browser_when_open_browser_is_true(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=True)
+                _serve(_SERVED_DIR, 5050, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:5050/")
 
     def test_does_not_open_browser_when_open_browser_is_false(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=False)
+                _serve(_SERVED_DIR, 5050, open_browser=False)
         mock_open.assert_not_called()
 
     def test_binds_to_localhost_on_given_port(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd) as MockServer:
             with patch("src.boot.webbrowser.open"):
-                _serve(_SERVED_DIR, 8080, config=_TRIMMED, open_browser=False)
+                _serve(_SERVED_DIR, 8080, open_browser=False)
         MockServer.assert_called_once_with(("127.0.0.1", 8080), MockServer.call_args[0][1])
 
     def test_serve_forever_is_called(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open"):
-                _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=False)
+                _serve(_SERVED_DIR, 5050, open_browser=False)
         httpd.serve_forever.assert_called_once()
 
-    def test_keyboard_interrupt_is_handled_gracefully(self):
+    def test_an_interrupt_reaches_the_caller(self):
         httpd = self._make_httpd_mock()
+        httpd.serve_forever.side_effect = Cancel
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open"):
-                # Should NOT propagate KeyboardInterrupt to the caller
-                _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=False)
-
-    def test_stopping_says_so(self, capsys):
-        httpd = self._make_httpd_mock()
-        with patch("src.boot.http.server.HTTPServer", return_value=httpd):
-            with patch("src.boot.webbrowser.open"):
-                _serve(_SERVED_DIR, 5050, config=_TRIMMED, open_browser=False)
-        assert capsys.readouterr().out.splitlines()[-1] == "Stopped."
-
-    def test_the_decorated_stop_notice_carries_a_glyph(self, capsys):
-        httpd = self._make_httpd_mock()
-        with patch("src.boot.http.server.HTTPServer", return_value=httpd):
-            with patch("src.boot.webbrowser.open"):
-                _serve(_SERVED_DIR, 5050, config=_DECORATED, open_browser=False)
-        assert capsys.readouterr().out.splitlines()[-1] == "! Stopped."
+                with pytest.raises(Cancel):
+                    _serve(_SERVED_DIR, 5050, open_browser=False)
 
     def test_url_is_constructed_from_port(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(_SERVED_DIR, 9999, config=_TRIMMED, open_browser=True)
+                _serve(_SERVED_DIR, 9999, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:9999/")
+
+
+class TestStopping:
+    """What the command says and raises when the user interrupts the server."""
+
+    def test_cancelling_raises_a_cancel(self):
+        with pytest.raises(Cancel):
+            _boot(_TRIMMED).cancel()
+
+    def test_abandoning_raises_an_abandon(self):
+        with pytest.raises(Abandon):
+            _boot(_TRIMMED).abandon()
+
+    def test_cancelling_says_so(self, capsys):
+        with pytest.raises(Cancel):
+            _boot(_TRIMMED).cancel()
+        assert capsys.readouterr().out.splitlines()[-1] == "Stopped."
+
+    def test_abandoning_says_so(self, capsys):
+        with pytest.raises(Abandon):
+            _boot(_TRIMMED).abandon()
+        assert capsys.readouterr().out.splitlines()[-1] == "Stopped."
+
+    def test_the_decorated_stop_notice_carries_a_glyph(self, capsys):
+        with pytest.raises(Cancel):
+            _boot(_DECORATED).cancel()
+        assert capsys.readouterr().out.splitlines()[-1] == "! Stopped."

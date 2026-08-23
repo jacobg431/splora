@@ -9,6 +9,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
+from src.command import Abandon, Cancel, Command, Interrupt
 from src.outcome import EXIT_ERROR, EXIT_OK, Outcome
 from src.terminal import OutputConfig, notice_line
 
@@ -78,8 +79,8 @@ def _find_free_port(start: int = _DEFAULT_PORT, attempts: int = _PORT_ATTEMPTS) 
     raise OSError(f"No free port available in range {start}--{start + attempts - 1}.")
 
 
-def _serve(report_dir: Path, port: int, *, config: OutputConfig, open_browser: bool = True) -> None:
-    """Serve report_dir over HTTP on port and block until Ctrl+C."""
+def _serve(report_dir: Path, port: int, *, open_browser: bool = True) -> None:
+    """Serve report_dir over HTTP on port and block until the run is interrupted."""
     handler = functools.partial(_QuietHandler, directory=str(report_dir))
     url = f"http://localhost:{port}/"
     with http.server.HTTPServer(("127.0.0.1", port), handler) as httpd:
@@ -88,16 +89,35 @@ def _serve(report_dir: Path, port: int, *, config: OutputConfig, open_browser: b
         print("Press Ctrl+C to stop.")
         if open_browser:
             webbrowser.open(url)
+        httpd.serve_forever()
+
+
+class Boot(Command):
+    """The command that serves a generated report over HTTP."""
+
+    def __init__(self, args: argparse.Namespace, config: OutputConfig) -> None:
+        self._args = args
+        self._config = config
+
+    def run(self) -> Outcome:
+        """Serve a generated report over HTTP and open it in the browser."""
+        report_dir = _resolve_report_dir(self._args.name, _REPORT_DIR)
+        port = _find_free_port()
         try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print()
-            print(notice_line("Stopped.", config=config))
+            _serve(report_dir, port)
+        except Cancel:
+            pass
+        return Outcome(code=EXIT_OK)
 
+    def cancel(self) -> None:
+        """Shut the server down, which is how this command is meant to end."""
+        self._stop(Cancel)
 
-def boot(args: argparse.Namespace, config: OutputConfig) -> Outcome:
-    """Serve a generated report over HTTP and open it in the browser."""
-    report_dir = _resolve_report_dir(args.name, _REPORT_DIR)
-    port = _find_free_port()
-    _serve(report_dir, port, config=config)
-    return Outcome(code=EXIT_OK)
+    def abandon(self) -> None:
+        """Shut the server down without treating it as a clean finish."""
+        self._stop(Abandon)
+
+    def _stop(self, interrupt: type[Interrupt]) -> None:
+        print()
+        print(notice_line("Stopped.", config=self._config))
+        raise interrupt

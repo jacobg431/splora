@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import os
 
 from src.banner import Banner, installed_version
-from src.outcome import NextStep, Outcome
+from src.command import Command, Interrupt
+from src.escalation import escalating
+from src.outcome import EXIT_INTERRUPTED, EXIT_KILLED, NextStep
 from src.terminal import ACCENT, MUTED, OutputConfig, enable_virtual_terminal, paint
 
 _ADVICE_LABEL = "Next:"
@@ -24,14 +26,23 @@ def advice_line(next_step: NextStep, *, use_color: bool) -> str:
     )
 
 
-def run(body: Callable[[], Outcome], config: OutputConfig) -> int:
-    """Print the banner, run the command body, print its next-step advice, return its exit code."""
+def run(command: Command, config: OutputConfig) -> int:
+    """Print the banner, run the command, print its next-step advice, return its exit code."""
     if config.use_color:
         enable_virtual_terminal()
     if not config.trim:
         print(Banner(version=installed_version()).render(use_color=config.use_color))
         print()
-    outcome = body()
+    try:
+        with escalating(
+            cancel=command.cancel,
+            abandon=command.abandon,
+            kill_code=EXIT_KILLED,
+            exit_now=os._exit,
+        ):
+            outcome = command.run()
+    except Interrupt:
+        return EXIT_INTERRUPTED
     if not config.trim and outcome.next_step is not None:
         print()
         print(advice_line(outcome.next_step, use_color=config.use_color))

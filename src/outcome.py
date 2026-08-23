@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# The exit codes the tool issues. 2 is absent because argparse claims it for usage errors, and
-# 130 is the POSIX convention of 128 plus the signal number for SIGINT.
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_PARTIAL = 3
 EXIT_INTERRUPTED = 130
+EXIT_KILLED = 137
 
 
 @dataclass(frozen=True)

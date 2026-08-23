@@ -10,7 +10,9 @@ from unittest.mock import patch
 import pytest
 
 import src.boot as boot_mod
-from src.boot import _finished_reports, _latest_report, _resolve_report_dir, boot
+from src.boot import Boot, _finished_reports, _latest_report, _resolve_report_dir
+from src.command import Abandon, Cancel
+from src.outcome import EXIT_OK
 from src.terminal import OutputConfig
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
@@ -39,9 +41,9 @@ class TestBootCommand:
 
         with patch.object(boot_mod, "_serve") as mock_serve:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
-                boot(name_args("my-run"), _TRIMMED)
+                Boot(name_args("my-run"), _TRIMMED).run()
 
-        mock_serve.assert_called_once_with(report_dir / "my-run", 9001, config=_TRIMMED)
+        mock_serve.assert_called_once_with(report_dir / "my-run", 9001)
 
     def test_resolves_latest_report_when_no_name_given(
         self, tmp_path: Path, monkeypatch, name_args
@@ -53,9 +55,9 @@ class TestBootCommand:
 
         with patch.object(boot_mod, "_serve") as mock_serve:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
-                boot(name_args(), _TRIMMED)
+                Boot(name_args(), _TRIMMED).run()
 
-        mock_serve.assert_called_once_with(report_dir / "second", 9001, config=_TRIMMED)
+        mock_serve.assert_called_once_with(report_dir / "second", 9001)
 
     def test_name_sanitization_resolves_correct_directory(
         self, tmp_path: Path, monkeypatch, name_args
@@ -65,22 +67,22 @@ class TestBootCommand:
 
         with patch.object(boot_mod, "_serve") as mock_serve:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
-                boot(name_args("C:drive"), _TRIMMED)
+                Boot(name_args("C:drive"), _TRIMMED).run()
 
-        mock_serve.assert_called_once_with(report_dir / "C_drive", 9001, config=_TRIMMED)
+        mock_serve.assert_called_once_with(report_dir / "C_drive", 9001)
 
     def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            boot(name_args("nonexistent"), _TRIMMED)
+            Boot(name_args("nonexistent"), _TRIMMED).run()
         assert exc.value.code == 1
 
     def test_empty_report_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            boot(name_args(), _TRIMMED)
+            Boot(name_args(), _TRIMMED).run()
         assert exc.value.code == 1
 
     def test_port_is_found_before_serve_is_called(self, tmp_path: Path, monkeypatch, name_args):
@@ -98,9 +100,31 @@ class TestBootCommand:
 
         with patch.object(boot_mod, "_find_free_port", side_effect=fake_find_port):
             with patch.object(boot_mod, "_serve", side_effect=fake_serve):
-                boot(name_args("my-run"), _TRIMMED)
+                Boot(name_args("my-run"), _TRIMMED).run()
 
         assert call_order == ["find_port", "serve"]
+
+
+class TestStopping:
+    """How the command ends once the user interrupts the server it started."""
+
+    def _served(self, tmp_path: Path, monkeypatch, name_args, interrupt):
+        report_dir = _patch(monkeypatch, tmp_path)
+        (report_dir / "my-run").mkdir()
+        command = Boot(name_args("my-run"), _TRIMMED)
+        with patch.object(boot_mod, "_find_free_port", return_value=9001):
+            with patch.object(boot_mod, "_serve", side_effect=interrupt):
+                return command.run()
+
+    def test_a_cancel_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args):
+        assert self._served(tmp_path, monkeypatch, name_args, Cancel).code == EXIT_OK
+
+    def test_a_cancel_offers_no_next_step(self, tmp_path: Path, monkeypatch, name_args):
+        assert self._served(tmp_path, monkeypatch, name_args, Cancel).next_step is None
+
+    def test_an_abandon_is_left_for_the_frame(self, tmp_path: Path, monkeypatch, name_args):
+        with pytest.raises(Abandon):
+            self._served(tmp_path, monkeypatch, name_args, Abandon)
 
 
 class TestLatestReport:
