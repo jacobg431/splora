@@ -231,6 +231,7 @@ that has to be moved inside a function is a signal that the layering is wrong.
 ## Deferred Features
 
 - Multi-run comparison view (display two exploration runs side by side)
+- Add mypy as CI step. It is already shipped via the project, but not currently enforced.
 
 ---
 
