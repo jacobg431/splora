@@ -9,7 +9,8 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from src.command import Abandon, Cancel, Command, Interrupt
+from src.command import Command
+from src.escalation import Cancel, Response
 from src.outcome import EXIT_ERROR, EXIT_OK, Outcome
 from src.terminal import OutputConfig, notice_line
 
@@ -109,15 +110,15 @@ class Boot(Command):
             pass
         return Outcome(code=EXIT_OK)
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Shut the server down, which is how this command is meant to end."""
-        self._stop(Cancel)
+        return self._stop()
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Shut the server down without treating it as a clean finish."""
-        self._stop(Abandon)
+        return self._stop()
 
-    def _stop(self, interrupt: type[Interrupt]) -> None:
+    def _stop(self) -> Response:
         print()
         print(notice_line("Stopped.", config=self._config))
-        raise interrupt
+        return Response.UNWIND

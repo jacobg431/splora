@@ -2,19 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from src.escalation import Response
 from src.outcome import Outcome
-
-
-class Interrupt(KeyboardInterrupt):
-    """A Ctrl+C that the run frame is expected to catch."""
-
-
-class Cancel(Interrupt):
-    """A first Ctrl+C, raised by a command with no cooperative stopping point of its own."""
-
-
-class Abandon(Interrupt):
-    """A second Ctrl+C, discarding whatever work was in flight."""
 
 
 class Command(ABC):
@@ -25,9 +14,9 @@ class Command(ABC):
         """Carry out the command and report its result."""
 
     @abstractmethod
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Stop as soon as it is safe to do so, keeping whatever is already valid."""
 
     @abstractmethod
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Give up in-flight work now, leaving nothing half-written behind."""

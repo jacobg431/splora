@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.command import Abandon, Cancel, Command, Interrupt
+from src.command import Command
+from src.escalation import Response
 from src.outcome import EXIT_OK, Outcome
 
 
@@ -15,11 +16,13 @@ class _Complete(Command):
         """Report a run that succeeded."""
         return Outcome(code=EXIT_OK)
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Stop, having nothing to wind down."""
+        return Response.HANDLED
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Give up, having nothing to discard."""
+        return Response.UNWIND
 
 
 class _WithoutAbandon(Command):
@@ -29,42 +32,9 @@ class _WithoutAbandon(Command):
         """Report a run that succeeded."""
         return Outcome(code=EXIT_OK)
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Stop, having nothing to wind down."""
-
-
-class TestExceptionFamily:
-    """How the interrupt exceptions relate to one another."""
-
-    def test_an_interrupt_is_a_keyboard_interrupt(self):
-        assert issubclass(Interrupt, KeyboardInterrupt)
-
-    def test_a_cancel_is_an_interrupt(self):
-        assert issubclass(Cancel, Interrupt)
-
-    def test_an_abandon_is_an_interrupt(self):
-        assert issubclass(Abandon, Interrupt)
-
-    def test_an_abandon_is_not_a_cancel(self):
-        assert not issubclass(Abandon, Cancel)
-
-    def test_a_cancel_is_not_an_abandon(self):
-        assert not issubclass(Cancel, Abandon)
-
-    def test_catching_the_family_catches_a_cancel(self):
-        with pytest.raises(Interrupt):
-            raise Cancel
-
-    def test_catching_the_family_catches_an_abandon(self):
-        with pytest.raises(Interrupt):
-            raise Abandon
-
-    def test_a_broad_exception_handler_does_not_catch_the_family(self):
-        with pytest.raises(Abandon):
-            try:
-                raise Abandon
-            except Exception as caught:
-                raise AssertionError("a broad handler swallowed an Abandon") from caught
+        return Response.HANDLED
 
 
 class TestContract:

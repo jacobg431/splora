@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 
 from src.banner import Banner, installed_version
-from src.command import Command, Interrupt
-from src.escalation import escalating
+from src.command import Command
+from src.escalation import Interrupt, escalating
 from src.outcome import EXIT_INTERRUPTED, EXIT_KILLED, NextStep
 from src.terminal import ACCENT, MUTED, OutputConfig, enable_virtual_terminal, paint
 

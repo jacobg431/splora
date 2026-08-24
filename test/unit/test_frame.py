@@ -8,7 +8,8 @@ import pytest
 
 import src.frame as frame_mod
 from src.banner import TAGLINE
-from src.command import Abandon, Cancel, Command
+from src.command import Command
+from src.escalation import Abandon, Cancel, Response
 from src.frame import advice_line, run
 from src.outcome import EXIT_INTERRUPTED, EXIT_OK, EXIT_PARTIAL, NextStep, Outcome
 from src.terminal import OutputConfig
@@ -45,11 +46,13 @@ class _Stub(Command):
             print(self._output)
         return self._outcome
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Do nothing; this command is never cancelled."""
+        return Response.HANDLED
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Do nothing; this command is never abandoned."""
+        return Response.UNWIND
 
 
 class _Raising(Command):
@@ -62,11 +65,13 @@ class _Raising(Command):
         """Raise the prepared error instead of reporting an outcome."""
         raise self._error
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Do nothing; the error is raised by run instead."""
+        return Response.HANDLED
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Do nothing; the error is raised by run instead."""
+        return Response.UNWIND
 
 
 class _Watching(Command):
@@ -80,11 +85,13 @@ class _Watching(Command):
         self.handler_while_running = signal.getsignal(signal.SIGINT)
         return Outcome(code=EXIT_OK)
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Do nothing; this command is never cancelled."""
+        return Response.HANDLED
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Do nothing; this command is never abandoned."""
+        return Response.UNWIND
 
 
 def _decorated() -> OutputConfig:

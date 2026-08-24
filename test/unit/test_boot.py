@@ -2,25 +2,15 @@
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.boot import Boot, _find_free_port, _sanitize, _serve
-from src.command import Abandon, Cancel
-from src.terminal import OutputConfig
+from src.boot import _find_free_port, _sanitize, _serve
+from src.escalation import Cancel
 
 _SERVED_DIR = Path("/reports/my-run")
-
-
-_TRIMMED = OutputConfig(trim=True, use_color=False)
-_DECORATED = OutputConfig(trim=False, use_color=False)
-
-
-def _boot(config: OutputConfig) -> Boot:
-    return Boot(argparse.Namespace(name=None), config)
 
 
 class TestSanitize:
@@ -136,30 +126,3 @@ class TestServe:
             with patch("src.boot.webbrowser.open") as mock_open:
                 _serve(_SERVED_DIR, 9999, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:9999/")
-
-
-class TestStopping:
-    """What the command says and raises when the user interrupts the server."""
-
-    def test_cancelling_raises_a_cancel(self):
-        with pytest.raises(Cancel):
-            _boot(_TRIMMED).cancel()
-
-    def test_abandoning_raises_an_abandon(self):
-        with pytest.raises(Abandon):
-            _boot(_TRIMMED).abandon()
-
-    def test_cancelling_says_so(self, capsys):
-        with pytest.raises(Cancel):
-            _boot(_TRIMMED).cancel()
-        assert capsys.readouterr().out.splitlines()[-1] == "Stopped."
-
-    def test_abandoning_says_so(self, capsys):
-        with pytest.raises(Abandon):
-            _boot(_TRIMMED).abandon()
-        assert capsys.readouterr().out.splitlines()[-1] == "Stopped."
-
-    def test_the_decorated_stop_notice_carries_a_glyph(self, capsys):
-        with pytest.raises(Cancel):
-            _boot(_DECORATED).cancel()
-        assert capsys.readouterr().out.splitlines()[-1] == "! Stopped."

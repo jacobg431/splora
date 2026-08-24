@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 import src.report as report_mod
-from src.command import Abandon, Cancel
+from src.escalation import Cancel, Response
 from src.outcome import EXIT_OK
 from src.report import (
     Report,
@@ -32,22 +32,12 @@ _REAL_COPYTREE = shutil.copytree
 _REAL_RMTREE = shutil.rmtree
 
 
-def _cancelling(command: Report):
-    """Return a copytree stand-in that stages the tree in full and then cancels the command."""
+def _cancelling(press):
+    """Return a copytree stand-in that stages the tree in full and then presses once."""
 
     def stage(src, dst, *_args, **_kwargs):
         _REAL_COPYTREE(src, dst)
-        command.cancel()
-
-    return stage
-
-
-def _abandoning(command: Report):
-    """Return a copytree stand-in that stages the tree in full and then abandons the command."""
-
-    def stage(src, dst, *_args, **_kwargs):
-        _REAL_COPYTREE(src, dst)
-        command.abandon()
+        press(1)
 
     return stage
 
@@ -555,45 +545,44 @@ class TestStaging:
 class TestCancel:
     """A Ctrl+C arriving while the report is being assembled."""
 
-    def _cancelled(self, tmp_path: Path, monkeypatch, name_args, config=_TRIMMED):
+    def _cancelled(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, config=_TRIMMED
+    ):
         fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         command = Report(name_args("my-run"), config)
-        monkeypatch.setattr(report_mod.shutil, "copytree", _cancelling(command))
-        with pytest.raises(Cancel):
-            command.run()
+        monkeypatch.setattr(report_mod.shutil, "copytree", _cancelling(press))
+        with escalating_run(command):
+            with pytest.raises(Cancel):
+                command.run()
         return report_dir
 
-    def test_an_abandon_is_raised_as_such(self, tmp_path: Path, monkeypatch, name_args):
-        fs_dir, _, _ = _patch(monkeypatch, tmp_path)
-        _make_fs_json(fs_dir, "my-run")
-        command = Report(name_args("my-run"), _TRIMMED)
-        monkeypatch.setattr(report_mod.shutil, "copytree", _abandoning(command))
-        with pytest.raises(Abandon):
-            command.run()
-
-    def test_leaves_no_staging_directory(self, tmp_path: Path, monkeypatch, name_args):
-        report_dir = self._cancelled(tmp_path, monkeypatch, name_args)
+    def test_leaves_no_staging_directory(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press
+    ):
+        report_dir = self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert not _staging_dir(report_dir / "my-run").exists()
 
-    def test_writes_no_report(self, tmp_path: Path, monkeypatch, name_args):
-        report_dir = self._cancelled(tmp_path, monkeypatch, name_args)
+    def test_writes_no_report(self, tmp_path: Path, monkeypatch, name_args, escalating_run, press):
+        report_dir = self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert not (report_dir / "my-run").exists()
 
-    def test_says_it_was_canceled(self, tmp_path: Path, monkeypatch, name_args, capsys):
-        self._cancelled(tmp_path, monkeypatch, name_args)
+    def test_says_it_was_canceled(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+    ):
+        self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert "Canceled." in capsys.readouterr().out
 
     def test_the_trimmed_notice_is_the_bare_message(
-        self, tmp_path: Path, monkeypatch, name_args, capsys
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
     ):
-        self._cancelled(tmp_path, monkeypatch, name_args)
+        self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert capsys.readouterr().out.splitlines()[-1] == "Canceled."
 
     def test_the_decorated_notice_carries_a_glyph(
-        self, tmp_path: Path, monkeypatch, name_args, capsys
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
     ):
-        self._cancelled(tmp_path, monkeypatch, name_args, config=_DECORATED)
+        self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press, config=_DECORATED)
         assert capsys.readouterr().out.splitlines()[-1] == "! Canceled."
 
 
@@ -646,3 +635,42 @@ class TestOutcome:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         assert Report(name_args("my-run"), _TRIMMED).run().next_step.name == "my-run"
+
+
+def _report_building(tmp_path: Path, monkeypatch, name_args) -> Report:
+    fs_dir, *_ = _patch(monkeypatch, tmp_path)
+    _make_fs_json(fs_dir, "my-run")
+    return Report(name_args("my-run"), _TRIMMED)
+
+
+def _report_swapping(tmp_path: Path, monkeypatch, name_args) -> Report:
+    command = _report_building(tmp_path, monkeypatch, name_args)
+    command._entering_swap()
+    return command
+
+
+_CASES = [
+    pytest.param(_report_building, "cancel", Response.UNWIND, "Canceled.", id="building/cancel"),
+    pytest.param(_report_building, "abandon", Response.UNWIND, "Canceled.", id="building/abandon"),
+    pytest.param(_report_swapping, "cancel", Response.HANDLED, None, id="swapping/cancel"),
+    pytest.param(_report_swapping, "abandon", Response.HANDLED, None, id="swapping/abandon"),
+]
+
+
+class TestInterruptResponse:
+    """What cancel() and abandon() answer and print, in each phase."""
+
+    @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
+    def test_interrupt_response(
+        self,
+        make_command,
+        action,
+        expected,
+        notice,
+        tmp_path,
+        monkeypatch,
+        name_args,
+        assert_interrupt_response,
+    ):
+        command = make_command(tmp_path, monkeypatch, name_args)
+        assert_interrupt_response(command, action, expected, notice)

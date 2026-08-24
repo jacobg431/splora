@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 import src.explore as explore_mod
-from src.command import Abandon
+from src.escalation import Abandon, Response
 from src.explore import Explore, _scan_dir, _State
 from src.outcome import EXIT_OK, EXIT_PARTIAL
 from src.progress import Progress
@@ -525,25 +525,41 @@ class TestInterruptedCommit:
         command.run()
         assert "Saving the scan; press Ctrl+C again to discard it." in capsys.readouterr().out
 
-    def test_an_abandon_discards_the_write(self, tmp_path: Path, monkeypatch):
-        command, json_path = self._pressed(tmp_path, monkeypatch, "abandon")
-        with pytest.raises(Abandon):
-            command.run()
+    def _pressed_to_abandon(self, tmp_path, monkeypatch, press, config=_TRIMMED):
+        scan = _make_scan_tree(tmp_path)
+        out_dir = _patch(monkeypatch, tmp_path)
+        command = Explore(_args(path=str(scan), name="saved"), config)
+        monkeypatch.setattr(explore_mod, "json", _JsonCalling(lambda: press(2)))
+        return command, out_dir / "saved.json"
+
+    def test_an_abandon_discards_the_write(
+        self, tmp_path: Path, monkeypatch, escalating_run, press
+    ):
+        command, json_path = self._pressed_to_abandon(tmp_path, monkeypatch, press)
+        with escalating_run(command):
+            with pytest.raises(Abandon):
+                command.run()
         assert not json_path.exists()
 
-    def test_an_abandon_leaves_no_partial_file_behind(self, tmp_path: Path, monkeypatch):
-        command, json_path = self._pressed(tmp_path, monkeypatch, "abandon")
-        with pytest.raises(Abandon):
-            command.run()
+    def test_an_abandon_leaves_no_partial_file_behind(
+        self, tmp_path: Path, monkeypatch, escalating_run, press
+    ):
+        command, json_path = self._pressed_to_abandon(tmp_path, monkeypatch, press)
+        with escalating_run(command):
+            with pytest.raises(Abandon):
+                command.run()
         assert list(json_path.parent.glob("*.tmp")) == []
 
-    def test_an_abandon_after_the_write_removes_the_temp_file(self, tmp_path: Path, monkeypatch):
+    def test_an_abandon_after_the_write_removes_the_temp_file(
+        self, tmp_path: Path, monkeypatch, escalating_run, press
+    ):
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         command = Explore(_args(path=str(scan), name="saved"), _TRIMMED)
-        monkeypatch.setattr(Path, "replace", _replace_calling(command.abandon))
-        with pytest.raises(Abandon):
-            command.run()
+        monkeypatch.setattr(Path, "replace", _replace_calling(lambda: press(2)))
+        with escalating_run(command):
+            with pytest.raises(Abandon):
+                command.run()
         assert list(out_dir.glob("*.tmp")) == []
         assert not (out_dir / "saved.json").exists()
 
@@ -551,33 +567,98 @@ class TestInterruptedCommit:
 class TestAbandonedScan:
     """A second Ctrl+C, which discards the scan outright."""
 
-    def _abandoned(self, tmp_path, monkeypatch, config=_TRIMMED):
+    def _abandoned(self, tmp_path, monkeypatch, escalating_run, press, config=_TRIMMED):
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         command = Explore(_args(path=str(scan), name="stopped"), config)
-        monkeypatch.setattr(
-            explore_mod, "_scan_dir", _scan_calling(command.cancel, command.abandon)
-        )
-        with pytest.raises(Abandon):
-            command.run()
+        monkeypatch.setattr(explore_mod, "_scan_dir", _scan_calling(lambda: press(2)))
+        with escalating_run(command):
+            with pytest.raises(Abandon):
+                command.run()
         return out_dir / "stopped.json"
 
-    def test_it_writes_nothing(self, tmp_path: Path, monkeypatch):
-        json_path = self._abandoned(tmp_path, monkeypatch)
+    def test_it_writes_nothing(self, tmp_path: Path, monkeypatch, escalating_run, press):
+        json_path = self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert not json_path.exists()
 
-    def test_it_leaves_no_partial_file_behind(self, tmp_path: Path, monkeypatch):
-        json_path = self._abandoned(tmp_path, monkeypatch)
+    def test_it_leaves_no_partial_file_behind(
+        self, tmp_path: Path, monkeypatch, escalating_run, press
+    ):
+        json_path = self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert list(json_path.parent.glob("*.tmp")) == []
 
-    def test_it_says_the_scan_was_discarded(self, tmp_path: Path, monkeypatch, capsys):
-        self._abandoned(tmp_path, monkeypatch)
+    def test_it_says_the_scan_was_discarded(
+        self, tmp_path: Path, monkeypatch, escalating_run, press, capsys
+    ):
+        self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert "Discarded; no scan was saved." in capsys.readouterr().out
 
-    def test_the_trimmed_notice_is_the_bare_message(self, tmp_path: Path, monkeypatch, capsys):
-        self._abandoned(tmp_path, monkeypatch)
+    def test_the_trimmed_notice_is_the_bare_message(
+        self, tmp_path: Path, monkeypatch, escalating_run, press, capsys
+    ):
+        self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert capsys.readouterr().out.splitlines()[-1] == "Discarded; no scan was saved."
 
-    def test_the_decorated_notice_carries_a_glyph(self, tmp_path: Path, monkeypatch, capsys):
-        self._abandoned(tmp_path, monkeypatch, config=_DECORATED)
+    def test_the_decorated_notice_carries_a_glyph(
+        self, tmp_path: Path, monkeypatch, escalating_run, press, capsys
+    ):
+        self._abandoned(tmp_path, monkeypatch, escalating_run, press, config=_DECORATED)
         assert capsys.readouterr().out.splitlines()[-1] == "! Discarded; no scan was saved."
+
+
+def _explore_scanning(tmp_path: Path, monkeypatch) -> Explore:
+    scan = _make_scan_tree(tmp_path)
+    _patch(monkeypatch, tmp_path)
+    return Explore(_args(path=str(scan), name="phase-run"), _TRIMMED)
+
+
+def _explore_committing(tmp_path: Path, monkeypatch) -> Explore:
+    command = _explore_scanning(tmp_path, monkeypatch)
+    command._committing = True
+    return command
+
+
+_CASES = [
+    pytest.param(
+        _explore_scanning,
+        "cancel",
+        Response.HANDLED,
+        "the partial scan will be saved",
+        id="scanning/cancel",
+    ),
+    pytest.param(
+        _explore_scanning,
+        "abandon",
+        Response.UNWIND,
+        "Discarded; no scan was saved.",
+        id="scanning/abandon",
+    ),
+    pytest.param(
+        _explore_committing, "cancel", Response.HANDLED, "Saving the scan", id="committing/cancel"
+    ),
+    pytest.param(
+        _explore_committing,
+        "abandon",
+        Response.UNWIND,
+        "Discarded; no scan was saved.",
+        id="committing/abandon",
+    ),
+]
+
+
+class TestInterruptResponse:
+    """What cancel() and abandon() answer and print, in each phase."""
+
+    @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
+    def test_interrupt_response(
+        self,
+        make_command,
+        action,
+        expected,
+        notice,
+        tmp_path,
+        monkeypatch,
+        assert_interrupt_response,
+    ):
+        command = make_command(tmp_path, monkeypatch)
+        assert_interrupt_response(command, action, expected, notice)

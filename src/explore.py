@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.command import Abandon, Command
+from src.command import Command
+from src.escalation import Response
 from src.outcome import EXIT_ERROR, EXIT_OK, EXIT_PARTIAL, NextStep, Outcome
 from src.progress import Progress
 from src.terminal import OutputConfig, format_bytes, notice_line
@@ -330,19 +331,20 @@ class Explore(Command):
         code = EXIT_PARTIAL if self._state.stopped else EXIT_OK
         return Outcome(code=code, next_step=NextStep(command="report", name=raw_name))
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Stop the scan at the next file, or acknowledge a press arriving once it is over."""
         if self._committing:
             self._notify("Saving the scan; press Ctrl+C again to discard it.")
-            return
+            return Response.HANDLED
         self._cancelled = True
         self._state.stopped = True
         self._notify("Stopping; the partial scan will be saved. Press Ctrl+C again to discard it.")
+        return Response.HANDLED
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Discard the scan, leaving nothing written."""
         self._notify("Discarded; no scan was saved.")
-        raise Abandon
+        return Response.UNWIND
 
     def _resolved_root(self) -> Path:
         root = Path(self._args.path).resolve()

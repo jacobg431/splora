@@ -6,7 +6,7 @@ import signal
 
 import pytest
 
-from src.escalation import escalating
+from src.escalation import Abandon, Cancel, Interrupt, Response, escalating
 
 _KILL_CODE = 137
 
@@ -14,18 +14,27 @@ _KILL_CODE = 137
 class _Responses:
     """A recording stand-in for the three things a Ctrl+C can trigger."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        cancel_response: Response = Response.HANDLED,
+        abandon_response: Response = Response.HANDLED,
+    ) -> None:
         self.cancels = 0
         self.abandons = 0
         self.exits: list[int] = []
+        self._cancel_response = cancel_response
+        self._abandon_response = abandon_response
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Record a request to stop when safe."""
         self.cancels += 1
+        return self._cancel_response
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Record a request to discard the work in flight."""
         self.abandons += 1
+        return self._abandon_response
 
     def exit_now(self, code: int) -> None:
         """Record a hard kill and the code it would have exited with."""
@@ -134,32 +143,97 @@ class TestHandlerRestoration:
         assert signal.getsignal(signal.SIGINT) is before
 
 
-class TestRaisingResponse:
-    """A response that unwinds the run rather than returning to it."""
+class TestExceptionFamily:
+    """How the interrupt exceptions relate to one another."""
 
-    def test_a_raising_cancel_reaches_the_caller(self):
-        def cancel() -> None:
-            raise KeyboardInterrupt
+    def test_an_interrupt_is_a_keyboard_interrupt(self):
+        assert issubclass(Interrupt, KeyboardInterrupt)
 
-        with pytest.raises(KeyboardInterrupt):
+    def test_a_cancel_is_an_interrupt(self):
+        assert issubclass(Cancel, Interrupt)
+
+    def test_an_abandon_is_an_interrupt(self):
+        assert issubclass(Abandon, Interrupt)
+
+    def test_an_abandon_is_not_a_cancel(self):
+        assert not issubclass(Abandon, Cancel)
+
+    def test_a_cancel_is_not_an_abandon(self):
+        assert not issubclass(Cancel, Abandon)
+
+    def test_catching_the_family_catches_a_cancel(self):
+        with pytest.raises(Interrupt):
+            raise Cancel
+
+    def test_catching_the_family_catches_an_abandon(self):
+        with pytest.raises(Interrupt):
+            raise Abandon
+
+    def test_a_broad_exception_handler_does_not_catch_the_family(self):
+        with pytest.raises(Abandon):
+            try:
+                raise Abandon
+            except Exception as caught:
+                raise AssertionError("a broad handler swallowed an Abandon") from caught
+
+
+class TestResponseDispatch:
+    """Whether a press unwinds the run, decided by what cancel/abandon answer."""
+
+    def test_cancel_answering_unwind_raises_cancel(self):
+        responses = _Responses(cancel_response=Response.UNWIND)
+        with pytest.raises(Cancel):
             with escalating(
-                cancel=cancel, abandon=lambda: None, kill_code=_KILL_CODE, exit_now=lambda _: None
+                cancel=responses.cancel,
+                abandon=responses.abandon,
+                kill_code=_KILL_CODE,
+                exit_now=responses.exit_now,
             ):
                 _press(1)
 
-    def test_a_raising_cancel_still_counts_its_press(self):
-        abandons = []
-
-        def cancel() -> None:
-            raise KeyboardInterrupt
-
+    def test_cancel_answering_handled_does_not_raise(self):
+        responses = _Responses(cancel_response=Response.HANDLED)
         with escalating(
-            cancel=cancel,
-            abandon=lambda: abandons.append(1),
+            cancel=responses.cancel,
+            abandon=responses.abandon,
             kill_code=_KILL_CODE,
-            exit_now=lambda _: None,
+            exit_now=responses.exit_now,
         ):
-            with pytest.raises(KeyboardInterrupt):
-                _press(1)
             _press(1)
-        assert abandons == [1]
+        assert responses.cancels == 1
+
+    def test_abandon_answering_unwind_raises_abandon(self):
+        responses = _Responses(abandon_response=Response.UNWIND)
+        with pytest.raises(Abandon):
+            with escalating(
+                cancel=responses.cancel,
+                abandon=responses.abandon,
+                kill_code=_KILL_CODE,
+                exit_now=responses.exit_now,
+            ):
+                _press(2)
+
+    def test_abandon_answering_handled_does_not_raise(self):
+        responses = _Responses(abandon_response=Response.HANDLED)
+        with escalating(
+            cancel=responses.cancel,
+            abandon=responses.abandon,
+            kill_code=_KILL_CODE,
+            exit_now=responses.exit_now,
+        ):
+            _press(2)
+        assert responses.abandons == 1
+
+    def test_a_handled_first_press_still_lets_a_second_press_unwind(self):
+        # Regression case: a double answering UNWIND for both presses makes the first raise
+        # before the second is ever reached, hiding the abandon path entirely.
+        responses = _Responses(cancel_response=Response.HANDLED, abandon_response=Response.UNWIND)
+        with pytest.raises(Abandon):
+            with escalating(
+                cancel=responses.cancel,
+                abandon=responses.abandon,
+                kill_code=_KILL_CODE,
+                exit_now=responses.exit_now,
+            ):
+                _press(2)
+        assert (responses.cancels, responses.abandons) == (1, 1)

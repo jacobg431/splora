@@ -11,7 +11,7 @@ import pytest
 
 import src.boot as boot_mod
 from src.boot import Boot, _finished_reports, _latest_report, _resolve_report_dir
-from src.command import Abandon, Cancel
+from src.escalation import Abandon, Cancel, Response
 from src.outcome import EXIT_OK
 from src.terminal import OutputConfig
 
@@ -125,6 +125,27 @@ class TestStopping:
     def test_an_abandon_is_left_for_the_frame(self, tmp_path: Path, monkeypatch, name_args):
         with pytest.raises(Abandon):
             self._served(tmp_path, monkeypatch, name_args, Abandon)
+
+
+def _boot_serving(name_args) -> Boot:
+    return Boot(name_args("my-run"), _TRIMMED)
+
+
+_CASES = [
+    pytest.param(_boot_serving, "cancel", Response.UNWIND, "Stopped.", id="serving/cancel"),
+    pytest.param(_boot_serving, "abandon", Response.UNWIND, "Stopped.", id="serving/abandon"),
+]
+
+
+class TestInterruptResponse:
+    """What cancel() and abandon() answer and print."""
+
+    @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
+    def test_interrupt_response(
+        self, make_command, action, expected, notice, name_args, assert_interrupt_response
+    ):
+        command = make_command(name_args)
+        assert_interrupt_response(command, action, expected, notice)
 
 
 class TestLatestReport:

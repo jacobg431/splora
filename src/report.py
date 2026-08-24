@@ -8,7 +8,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from src.command import Abandon, Cancel, Command, Interrupt
+from src.command import Command
+from src.escalation import Response
 from src.outcome import EXIT_ERROR, EXIT_OK, NextStep, Outcome
 from src.terminal import OutputConfig, notice_line
 
@@ -133,20 +134,20 @@ class Report(Command):
             print(notice_line("The report was already complete; it was kept.", config=self._config))
         return Outcome(code=EXIT_OK, next_step=NextStep(command="boot", name=json_path.stem))
 
-    def cancel(self) -> None:
+    def cancel(self) -> Response:
         """Abandon the build, leaving any previous report untouched."""
-        self._stop(Cancel)
+        return self._stop()
 
-    def abandon(self) -> None:
+    def abandon(self) -> Response:
         """Abandon the build, leaving any previous report untouched."""
-        self._stop(Abandon)
+        return self._stop()
 
     def _entering_swap(self) -> None:
         self._swapping = True
 
-    def _stop(self, interrupt: type[Interrupt]) -> None:
+    def _stop(self) -> Response:
         if self._swapping:
             self._interrupted_while_swapping = True
-            return
+            return Response.HANDLED
         print(notice_line("Canceled.", config=self._config))
-        raise interrupt
+        return Response.UNWIND
