@@ -5,13 +5,13 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 
 import src.boot as boot_mod
 from src.boot import Boot, _finished_reports, _latest_report, _resolve_report_dir
-from src.escalation import Abandon, Cancel, Response
+from src.escalation import Response
 from src.outcome import EXIT_OK
 from src.terminal import OutputConfig
 
@@ -43,7 +43,7 @@ class TestBootCommand:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
                 Boot(name_args("my-run"), _TRIMMED).run()
 
-        mock_serve.assert_called_once_with(report_dir / "my-run", 9001)
+        mock_serve.assert_called_once_with(report_dir / "my-run", 9001, should_stop=ANY)
 
     def test_resolves_latest_report_when_no_name_given(
         self, tmp_path: Path, monkeypatch, name_args
@@ -57,7 +57,7 @@ class TestBootCommand:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
                 Boot(name_args(), _TRIMMED).run()
 
-        mock_serve.assert_called_once_with(report_dir / "second", 9001)
+        mock_serve.assert_called_once_with(report_dir / "second", 9001, should_stop=ANY)
 
     def test_name_sanitization_resolves_correct_directory(
         self, tmp_path: Path, monkeypatch, name_args
@@ -69,7 +69,7 @@ class TestBootCommand:
             with patch.object(boot_mod, "_find_free_port", return_value=9001):
                 Boot(name_args("C:drive"), _TRIMMED).run()
 
-        mock_serve.assert_called_once_with(report_dir / "C_drive", 9001)
+        mock_serve.assert_called_once_with(report_dir / "C_drive", 9001, should_stop=ANY)
 
     def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
@@ -108,23 +108,27 @@ class TestBootCommand:
 class TestStopping:
     """How the command ends once the user interrupts the server it started."""
 
-    def _served(self, tmp_path: Path, monkeypatch, name_args, interrupt):
+    def _served(self, tmp_path: Path, monkeypatch, name_args, action: str):
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
         command = Boot(name_args("my-run"), _TRIMMED)
+
+        def fake_serve(_report_dir, _port, *, should_stop, **_kwargs):
+            getattr(command, action)()
+            assert should_stop()
+
         with patch.object(boot_mod, "_find_free_port", return_value=9001):
-            with patch.object(boot_mod, "_serve", side_effect=interrupt):
+            with patch.object(boot_mod, "_serve", side_effect=fake_serve):
                 return command.run()
 
     def test_a_cancel_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args):
-        assert self._served(tmp_path, monkeypatch, name_args, Cancel).code == EXIT_OK
+        assert self._served(tmp_path, monkeypatch, name_args, "cancel").code == EXIT_OK
 
     def test_a_cancel_offers_no_next_step(self, tmp_path: Path, monkeypatch, name_args):
-        assert self._served(tmp_path, monkeypatch, name_args, Cancel).next_step is None
+        assert self._served(tmp_path, monkeypatch, name_args, "cancel").next_step is None
 
-    def test_an_abandon_is_left_for_the_frame(self, tmp_path: Path, monkeypatch, name_args):
-        with pytest.raises(Abandon):
-            self._served(tmp_path, monkeypatch, name_args, Abandon)
+    def test_an_abandon_also_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args):
+        assert self._served(tmp_path, monkeypatch, name_args, "abandon").code == EXIT_OK
 
 
 def _boot_serving(name_args) -> Boot:
@@ -132,8 +136,8 @@ def _boot_serving(name_args) -> Boot:
 
 
 _CASES = [
-    pytest.param(_boot_serving, "cancel", Response.UNWIND, "Stopped.", id="serving/cancel"),
-    pytest.param(_boot_serving, "abandon", Response.UNWIND, "Stopped.", id="serving/abandon"),
+    pytest.param(_boot_serving, "cancel", Response.HANDLED, "Stopped.", id="serving/cancel"),
+    pytest.param(_boot_serving, "abandon", Response.HANDLED, "Stopped.", id="serving/abandon"),
 ]
 
 

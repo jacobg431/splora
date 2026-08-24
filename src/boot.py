@@ -7,10 +7,11 @@ import re
 import socket
 import sys
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 from src.command import Command
-from src.escalation import Cancel, Response
+from src.escalation import Response
 from src.outcome import EXIT_ERROR, EXIT_OK, Outcome
 from src.terminal import OutputConfig, notice_line
 
@@ -21,6 +22,7 @@ _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 _DEFAULT_PORT = 5050
 _PORT_ATTEMPTS = 20
 _STAGING_PREFIX = "."
+_POLL_INTERVAL = 0.5
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -80,17 +82,21 @@ def _find_free_port(start: int = _DEFAULT_PORT, attempts: int = _PORT_ATTEMPTS) 
     raise OSError(f"No free port available in range {start}--{start + attempts - 1}.")
 
 
-def _serve(report_dir: Path, port: int, *, open_browser: bool = True) -> None:
-    """Serve report_dir over HTTP on port and block until the run is interrupted."""
+def _serve(
+    report_dir: Path, port: int, *, should_stop: Callable[[], bool], open_browser: bool = True
+) -> None:
+    """Serve report_dir over HTTP on port until should_stop reports True."""
     handler = functools.partial(_QuietHandler, directory=str(report_dir))
     url = f"http://localhost:{port}/"
     with http.server.HTTPServer(("127.0.0.1", port), handler) as httpd:
+        httpd.timeout = _POLL_INTERVAL
         print(f"Serving    : {url}")
         print(f"Report     : {report_dir.name}")
         print("Press Ctrl+C to stop.")
         if open_browser:
             webbrowser.open(url)
-        httpd.serve_forever()
+        while not should_stop():
+            httpd.handle_request()
 
 
 class Boot(Command):
@@ -99,26 +105,25 @@ class Boot(Command):
     def __init__(self, args: argparse.Namespace, config: OutputConfig) -> None:
         self._args = args
         self._config = config
+        self._stop_requested = False
 
     def run(self) -> Outcome:
         """Serve a generated report over HTTP and open it in the browser."""
         report_dir = _resolve_report_dir(self._args.name, _REPORT_DIR)
         port = _find_free_port()
-        try:
-            _serve(report_dir, port)
-        except Cancel:
-            pass
+        _serve(report_dir, port, should_stop=lambda: self._stop_requested)
         return Outcome(code=EXIT_OK)
 
     def cancel(self) -> Response:
-        """Shut the server down, which is how this command is meant to end."""
+        """Stop serving, which is how this command is meant to end."""
         return self._stop()
 
     def abandon(self) -> Response:
-        """Shut the server down without treating it as a clean finish."""
+        """Stop serving; there is nothing in flight to discard."""
         return self._stop()
 
     def _stop(self) -> Response:
+        self._stop_requested = True
         print()
         print(notice_line("Stopped.", config=self._config))
-        return Response.UNWIND
+        return Response.HANDLED

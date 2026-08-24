@@ -59,6 +59,7 @@ def serve_dir() -> Callable[..., _Server]:
             kwargs={
                 "report_dir": report_dir,
                 "port": port,
+                "should_stop": lambda: False,
                 "open_browser": False,
             },
             daemon=True,
