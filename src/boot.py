@@ -85,7 +85,7 @@ def _find_free_port(start: int = _DEFAULT_PORT, attempts: int = _PORT_ATTEMPTS) 
 def _serve(
     report_dir: Path, port: int, *, should_stop: Callable[[], bool], open_browser: bool = True
 ) -> None:
-    """Serve report_dir over HTTP on port until should_stop reports True."""
+    """Serve report_dir over HTTP on port until the caller asks to stop."""
     handler = functools.partial(_QuietHandler, directory=str(report_dir))
     url = f"http://localhost:{port}/"
     with http.server.HTTPServer(("127.0.0.1", port), handler) as httpd:
