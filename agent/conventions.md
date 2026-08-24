@@ -12,6 +12,13 @@ This file is the source of truth, where a rule is also encoded as a check, the c
 - Run the tests before reporting a task complete. If they fail and you cannot fix them, say so.
 - A test may not consume the host's resources at scale to make itself work.
 - Encode a convention as a check wherever one can be written.
+- Change the smallest span that does the job rather than rewriting a whole class or file, and
+  never reach for scripted bulk regex over source.
+- Rename code instead of commenting what it does.
+- Write docs that stand alone for a reader who wasn't there when they were written, with no
+  rejected alternatives, forward references, or code samples in place of a concept.
+- Keep `log.md` entries at summary level and check for a missing trailing newline before
+  appending, since one can silently swallow the previous entry.
 
 ### How to recognize a design problem worth escalating
 
