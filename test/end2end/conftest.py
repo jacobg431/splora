@@ -114,15 +114,15 @@ def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
 
 
 def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
-    """Block until the stub process prints its readiness line."""
+    """Block until the mock command process prints its readiness line."""
     line = proc.stdout.readline()
     if line != _READY_LINE:
-        raise AssertionError(f"stub process did not print {_READY_LINE!r}; got {line!r}")
+        raise AssertionError(f"mock command process did not print {_READY_LINE!r}; got {line!r}")
 
 
 @pytest.fixture
-def stub_process() -> Callable[..., subprocess.Popen[str]]:
-    """Return a helper that launches the interrupt stub and waits for it to report ready."""
+def mock_command_process() -> Callable[..., subprocess.Popen[str]]:
+    """Return a helper that launches the mock command and waits for it to report ready."""
     procs: list[subprocess.Popen[str]] = []
 
     def launch(*, cancel: str = "handled", abandon: str = "unwind") -> subprocess.Popen[str]:
@@ -130,7 +130,7 @@ def stub_process() -> Callable[..., subprocess.Popen[str]]:
             [
                 sys.executable,
                 "-m",
-                "test.end2end.interrupt_stub",
+                "test.end2end.mock_command",
                 "--cancel",
                 cancel,
                 "--abandon",

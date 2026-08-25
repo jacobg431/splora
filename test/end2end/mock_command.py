@@ -1,4 +1,4 @@
-"""Runs a stub Command through the real frame, for a real subprocess to be signalled."""
+"""Runs a mock Command through the real frame, for a real subprocess to be signalled."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from src.terminal import OutputConfig
 _POLL_INTERVAL = 0.05
 
 
-class _Stub(Command):
+class MockCommand(Command):
     """A command that waits until interrupted, answering however it was configured to."""
 
     def __init__(self, cancel_response: Response, abandon_response: Response) -> None:
@@ -45,5 +45,5 @@ if __name__ == "__main__":
     parser.add_argument("--cancel", choices=("handled", "unwind"), default="handled")
     parser.add_argument("--abandon", choices=("handled", "unwind"), default="unwind")
     args = parser.parse_args()
-    stub = _Stub(_response(args.cancel), _response(args.abandon))
-    raise SystemExit(run(stub, OutputConfig(trim=True, use_color=False)))
+    command = MockCommand(_response(args.cancel), _response(args.abandon))
+    raise SystemExit(run(command, OutputConfig(trim=True, use_color=False)))
