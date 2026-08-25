@@ -7,7 +7,9 @@ All artifacts written to data/filesystem/ and data/report/ are deleted on teardo
 
 from __future__ import annotations
 
+import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -26,6 +28,7 @@ from src.report import _REPORT_DIR
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RUN_NAME = "splora-e2e"
 _PORT_START = 15000
+_READY_LINE = "Ready.\n"
 
 
 @dataclass(frozen=True)
@@ -108,6 +111,56 @@ def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
         )
 
     return attempt
+
+
+def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
+    """Block until the stub process prints its readiness line."""
+    line = proc.stdout.readline()
+    if line != _READY_LINE:
+        raise AssertionError(f"stub process did not print {_READY_LINE!r}; got {line!r}")
+
+
+@pytest.fixture
+def stub_process() -> Callable[..., subprocess.Popen[str]]:
+    """Return a helper that launches the interrupt stub and waits for it to report ready."""
+    procs: list[subprocess.Popen[str]] = []
+
+    def launch(*, cancel: str = "handled", abandon: str = "unwind") -> subprocess.Popen[str]:
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "test.end2end.interrupt_stub",
+                "--cancel",
+                cancel,
+                "--abandon",
+                abandon,
+            ],
+            cwd=PROJECT_ROOT,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        procs.append(proc)
+        _wait_until_ready(proc)
+        return proc
+
+    yield launch
+
+    for proc in procs:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
+@pytest.fixture
+def press() -> Callable[[subprocess.Popen[str]], None]:
+    """Return a helper that sends a real SIGINT to a live process."""
+
+    def send(proc: subprocess.Popen[str]) -> None:
+        os.kill(proc.pid, signal.SIGINT)
+
+    return send
 
 
 @pytest.fixture

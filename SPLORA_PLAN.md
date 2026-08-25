@@ -232,6 +232,9 @@ that has to be moved inside a function is a signal that the layering is wrong.
 
 - Multi-run comparison view (display two exploration runs side by side)
 - Add mypy as CI step. It is already shipped via the project, but not currently enforced.
+- Windows delivery for the end-to-end interrupt tests. They currently cover POSIX signal delivery
+  only — Windows needs `CTRL_C_EVENT` delivered to a dedicated process group instead of a plain
+  `SIGINT`, which is materially more involved to set up correctly.
 
 ---
 
