@@ -9,13 +9,30 @@ Three-step pipeline:
 
 ## Source Structure
 
-- `splora.py` — CLI entrypoint; argparse subcommands wired to `src/explore.py`, `src/report.py`, `src/boot.py`
-- `src/explore.py` — `os.scandir` traversal; `_State` dataclass for limits; CATEGORIES map; atomic JSON write
-- `src/report.py` — copies template + vendor assets into `data/report/<name>/`; injects `data.json`
-- `src/boot.py` — `http.server` on first free port ≥5050; `_QuietHandler` suppresses request logs; `webbrowser.open()`
-- `data/template/` — `index.html`, `style.css`, `script.js` (ECharts treemap UI)
+Production modules sit in layers, and a module may import only from a strictly lower one. The map
+is enforced by `test/lint/test_imports.py`, which also rejects any module absent from it.
+
+| Layer | Modules |
+|---|---|
+| entry point | `splora.py` |
+| commands | `src/explore.py`, `src/report.py`, `src/boot.py` |
+| runtime | `src/frame.py` |
+| components | `src/banner.py`, `src/command.py`, `src/progress.py` |
+| primitives | `src/escalation.py`, `src/outcome.py`, `src/terminal.py` |
+
+- `splora.py` — argparse subcommands plus a shared parent parser carrying `--trim-output` and `--no-color`; builds the `OutputConfig`, looks the chosen name up in a table mapping to `Command` classes, and hands the instance to the frame
+- `src/explore.py` — `os.scandir` traversal; `_State` limit tracker; CATEGORIES map; atomic JSON write; `Explore` implements `Command` — `cancel()` stops the scan (or just acknowledges once the result is being written), `abandon()` discards it
+- `src/report.py` — assembles the report in a dot-prefixed sibling under `data/report/`, then swaps it into place; injects `data.json`; `Report` implements `Command` — `cancel()`/`abandon()` both abandon the build unless the swap has already begun, in which case it is left to complete and the run still reports success
+- `src/boot.py` — `http.server` on first free port ≥5050, polling `handle_request()` in a loop instead of blocking in `serve_forever()`; `_QuietHandler` suppresses request logs; `webbrowser.open()`; `Boot` implements `Command` — `cancel()`/`abandon()` both stop the loop and answer `HANDLED`, since nothing about serving is ever unsafe to discard
+- `src/frame.py` — banner, then `command.run()` wrapped in `escalating()` so Ctrl+C reaches `command.cancel()`/`abandon()`, then the next-step advice; catches the `Interrupt` family and returns exit 130. Takes a `Command` instance, so it never imports a command module — declared in `runtime`, one layer below `commands`, for exactly that reason
+- `src/banner.py` — the ASCII emblem, wordmark, tagline and version printed once per run
+- `src/command.py` — the `Command` ABC: `run`, `cancel`, `abandon`, the latter two returning a `Response` (`HANDLED` or `UNWIND`)
+- `src/progress.py` — the live scan counter, redrawn in place and only when stderr is a terminal
+- `src/escalation.py` — the SIGINT dispatch: first press calls `cancel()`, second `abandon()`, third writes a fixed notice to stderr and hard-kills at exit 137; raises `Cancel`/`Abandon` only when the command answers `UNWIND`. Also defines `Response` and the `Interrupt`/`Cancel`/`Abandon` family
+- `src/terminal.py` — `OutputConfig` and its factory, colour helpers, byte and throughput formatting, the shared notice helper
+- `src/outcome.py` — the exit-code constants (`0`/`1`/`3`/`130`/`137`) and the `Outcome`/`NextStep` contract a command's `run()` returns
+- `data/template/` — `index.html`, `style.css`, `main.js` and the ES module tree under `core/`, `widgets/` and `ui/`
 - `data/config/default_excludes.txt` — built-in directory exclude list
-- `vendor/echarts.min.js` — bundled ECharts 5; committed to git for offline use
 
 ## Decided: Tech Stack & Design
 
@@ -106,25 +123,54 @@ Rationale (user): highest payoff for consistency and authenticity is to own the 
 
 ## Implementation Status
 
-All MVP features complete as of 2026-06-28. Frontend overhaul is next (branch: `frontend-overhaul`).
+MVP complete, frontend overhaul complete, terminal UX in progress on branch
+`terminal-ux-improvements`.
 
-- `explore.py` ✓ — fully implemented and tested (85 unit + 10 integration tests)
-- `report.py` ✓ — fully implemented and tested (30 unit + 10 integration tests)
-- `boot.py` ✓ — fully implemented and tested (29 unit + 10 integration tests)
-- E2E suite ✓ — 24 tests in `test/end2end/`; excluded from default `pytest` run
+- 19 lint + 252 unit + 148 integration tests run by default (2 skipped: symlink cases need
+  elevated Windows privileges); 45 end-to-end tests invoked explicitly
 - CI ✓ — `.github/workflows/continuous-integration.yaml`; ubuntu + windows; ruff format check
+
+### Terminal UX
+
+Done: the layered presentation modules above, the two global flags, the live progress line, exit
+codes `0`/`1`/`3`/`130`/`137`, the atomic report build, all-ASCII output, and the escalating
+interrupt response — first Ctrl+C cancels when safe, second abandons, third hard-kills — driven by
+`escalation.py` and answered by each command's own `cancel()`/`abandon()` (a `Response` of
+`HANDLED` or `UNWIND`, never a raise). `boot` treats both presses identically, since serving has
+nothing unsafe to discard; the other two commands distinguish them per their own phase.
+
+Deferred, and deliberately not started:
+
+- **End-to-end interrupt tests.** Holding a scan open long enough to signal it needed a fixture
+  writing 100,000 real files, which is not an acceptable cost to impose on the machine running
+  the tests. Any revival must hold the scan open without scaling file creation. Interrupt
+  behaviour is meanwhile covered at the integration tier on every platform, by driving the
+  handler the scan installs. A working synchronisation point was found and is worth reusing:
+  under `PYTHONUNBUFFERED=1` the child flushes its `Exploring :` line before the scan begins.
+- **The report swap loses the old report on a crash.** The swap removes the destination and then
+  renames the staged tree into it. A crash between the two leaves neither, and silently. The fix
+  is to rename the old aside instead, swap in, then delete the one moved aside. `Report`'s
+  interrupt handling carves out an exception for a press landing mid-swap — the run is left to
+  complete and reports success rather than claiming it was abandoned — specifically because this
+  same crash-loses-the-report defect would otherwise apply to an interrupt too; that carve-out
+  becomes unnecessary once the rename-aside fix lands, and should be deleted when it does.
 
 ## Report Folder Structure
 
 ```
 data/report/<safe-name>/
-  index.html       ← copied from data/template/
-  style.css        ← copied from data/template/
-  script.js        ← copied from data/template/
-  data.json        ← the raw JSON from data/filesystem/<name>.json
-  vendor/
-    echarts.min.js ← copied from vendor/
+  index.html   ← copied from data/template/
+  style.css    ← copied from data/template/
+  main.js      ← copied from data/template/
+  data.js      ← copied from data/template/
+  core/        ← copied from data/template/
+  widgets/     ← copied from data/template/
+  ui/          ← copied from data/template/
+  data.json    ← the raw JSON from data/filesystem/<name>.json
 ```
+
+While a report is being built it is assembled in `data/report/.<safe-name>.tmp` and swapped into
+place when complete. `boot` skips dot-prefixed directories so one left behind is never served.
 
 ## File Categories
 

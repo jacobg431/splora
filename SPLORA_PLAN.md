@@ -145,7 +145,7 @@ back to a static value when the package is not installed.
   ..........     ___) ||  __/ | |___ | |_| ||  _ <  / ___ \
   ..........    |____/ |_|    |_____| \___/ |_| \_\/_/   \_\
 
-  see where your disk went  -  v0.1.0
+  See where your disk went  -  v0.1.0
 ```
 
 The tagline is adopted in `README.md` as well, so the terminal and the documentation open with
@@ -231,6 +231,10 @@ that has to be moved inside a function is a signal that the layering is wrong.
 ## Deferred Features
 
 - Multi-run comparison view (display two exploration runs side by side)
+- Add mypy as CI step. It is already shipped via the project, but not currently enforced.
+- Windows delivery for the end-to-end interrupt tests. They currently cover POSIX signal delivery
+  only — Windows needs `CTRL_C_EVENT` delivered to a dedicated process group instead of a plain
+  `SIGINT`, which is materially more involved to set up correctly.
 
 ---
 

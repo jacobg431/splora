@@ -10,6 +10,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.command import Command
+from src.escalation import Response
+from src.outcome import EXIT_ERROR, EXIT_OK, EXIT_PARTIAL, NextStep, Outcome
+from src.progress import Progress
+from src.terminal import OutputConfig, format_bytes, notice_line
+
 # ── Extension → category mapping ───────────────────────────────────────────
 
 CATEGORIES: dict[str, str] = {
@@ -144,14 +150,6 @@ def _load_default_excludes() -> set[str]:
     return {ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("#")}
 
 
-def _fmt_bytes(n: float) -> str:
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if n < 1024:
-            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
-        n /= 1024
-    return f"{n:.1f} PB"
-
-
 # ── Traversal state ─────────────────────────────────────────────────────────
 
 
@@ -189,6 +187,7 @@ def _scan_dir(
     depth_limit: int,
     excludes: set[str],
     state: _State,
+    progress: Progress,
 ) -> dict:
     node: dict = {
         "name": path.name or str(path),
@@ -237,6 +236,7 @@ def _scan_dir(
             node["extensions"][key] = node["extensions"].get(key, 0) + 1
             node["categories"][cat] = node["categories"].get(cat, 0) + 1
             state.count_file()
+            progress.record(size)
 
         elif is_dir:
             if entry.name in excludes:
@@ -244,7 +244,7 @@ def _scan_dir(
             if depth_limit > 0 and depth >= depth_limit:
                 continue
 
-            child = _scan_dir(Path(entry.path), depth + 1, depth_limit, excludes, state)
+            child = _scan_dir(Path(entry.path), depth + 1, depth_limit, excludes, state, progress)
 
             node["size"] += child["size"]
             node["file_count"] += child["file_count"]
@@ -285,56 +285,113 @@ def _build_state(args: argparse.Namespace) -> _State:
 # ── Public entry point ──────────────────────────────────────────────────────
 
 
-def explore(args: argparse.Namespace) -> None:
-    """Traverse a file system and record its structure as JSON."""
-    root = Path(args.path).resolve()
+class Explore(Command):
+    """The command that traverses a file system and records what it finds."""
 
-    if not root.exists():
-        print(f"Error: path does not exist: {root}", file=sys.stderr)
-        sys.exit(1)
-    if not root.is_dir():
-        print(f"Error: not a directory: {root}", file=sys.stderr)
-        sys.exit(1)
+    def __init__(self, args: argparse.Namespace, config: OutputConfig) -> None:
+        self._args = args
+        self._config = config
+        self._state = _build_state(args)
+        self._progress: Progress | None = None
+        self._committing = False
+        self._cancelled = False
 
-    raw_name = _resolve_name(args, root)
-    safe_name = _sanitize(raw_name)
-    excludes = _build_excludes(args)
-    state = _build_state(args)
+    def run(self) -> Outcome:
+        """Traverse a file system and record its structure as JSON."""
+        root = self._resolved_root()
+        raw_name = _resolve_name(self._args, root)
+        excludes = _build_excludes(self._args)
 
-    _FS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = _FS_DIR / f"{safe_name}.json"
+        _FS_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = _FS_DIR / f"{_sanitize(raw_name)}.json"
 
-    print(f"Exploring : {root}")
-    if excludes:
-        sample = ", ".join(sorted(excludes)[:5])
-        extra = f" … (+{len(excludes) - 5} more)" if len(excludes) > 5 else ""
-        print(f"Excluding : {sample}{extra}")
+        print(f"Exploring : {root}")
+        if excludes:
+            sample = ", ".join(sorted(excludes)[:5])
+            extra = f" ... (+{len(excludes) - 5} more)" if len(excludes) > 5 else ""
+            print(f"Excluding : {sample}{extra}")
 
-    t0 = time.monotonic()
-    tree = _scan_dir(root, depth=0, depth_limit=args.depth, excludes=excludes, state=state)
-    elapsed = time.monotonic() - t0
+        self._progress = Progress(sys.stderr, use_color=self._config.use_color)
+        started = time.monotonic()
+        tree = _scan_dir(
+            root,
+            depth=0,
+            depth_limit=self._args.depth,
+            excludes=excludes,
+            state=self._state,
+            progress=self._progress,
+        )
+        self._progress.finish()
+        elapsed = time.monotonic() - started
 
-    output = {
-        "meta": {
-            "name": raw_name,
-            "root": str(root),
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "partial": state.stopped,
-            "total_size": tree["size"],
-            "total_files": tree["file_count"],
-            "elapsed_seconds": round(elapsed, 2),
-        },
-        "tree": tree,
-    }
+        self._committing = True
+        self._write(out_path, self._record(raw_name, root, tree, elapsed))
+        self._summarize(out_path, tree, elapsed)
 
-    # Write atomically: temp file → rename
-    tmp_path = out_path.with_suffix(".tmp")
-    tmp_path.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp_path.replace(out_path)
+        code = EXIT_PARTIAL if self._state.stopped else EXIT_OK
+        return Outcome(code=code, next_step=NextStep(command="report", name=raw_name))
 
-    partial_note = " (partial — limit reached)" if state.stopped else ""
-    print(f"\nDone{partial_note}.")
-    print(f"  Files   : {state.files_visited:,}")
-    print(f"  Size    : {_fmt_bytes(tree['size'])}")
-    print(f"  Elapsed : {elapsed:.1f}s")
-    print(f"  Output  : {out_path}")
+    def cancel(self) -> Response:
+        """Stop the scan at the next file, or acknowledge a press arriving once it is over."""
+        if self._committing:
+            self._notify("Saving the scan; press Ctrl+C again to discard it.")
+            return Response.HANDLED
+        self._cancelled = True
+        self._state.stopped = True
+        self._notify("Stopping; the partial scan will be saved. Press Ctrl+C again to discard it.")
+        return Response.HANDLED
+
+    def abandon(self) -> Response:
+        """Discard the scan, leaving nothing written."""
+        self._notify("Discarded; no scan was saved.")
+        return Response.UNWIND
+
+    def _resolved_root(self) -> Path:
+        root = Path(self._args.path).resolve()
+        if not root.exists():
+            print(f"Error: path does not exist: {root}", file=sys.stderr)
+            sys.exit(EXIT_ERROR)
+        if not root.is_dir():
+            print(f"Error: not a directory: {root}", file=sys.stderr)
+            sys.exit(EXIT_ERROR)
+        return root
+
+    def _record(self, raw_name: str, root: Path, tree: dict, elapsed: float) -> dict:
+        return {
+            "meta": {
+                "name": raw_name,
+                "root": str(root),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "partial": self._state.stopped,
+                "total_size": tree["size"],
+                "total_files": tree["file_count"],
+                "elapsed_seconds": round(elapsed, 2),
+            },
+            "tree": tree,
+        }
+
+    def _write(self, out_path: Path, record: dict) -> None:
+        tmp_path = out_path.with_suffix(".tmp")
+        try:
+            tmp_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+            tmp_path.replace(out_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    def _summarize(self, out_path: Path, tree: dict, elapsed: float) -> None:
+        if self._cancelled:
+            partial_note = " (partial -- stopped early)"
+        elif self._state.stopped:
+            partial_note = " (partial -- limit reached)"
+        else:
+            partial_note = ""
+        print(f"\nDone{partial_note}.")
+        print(f"  Files   : {self._state.files_visited:,}")
+        print(f"  Size    : {format_bytes(tree['size'])}")
+        print(f"  Elapsed : {elapsed:.1f}s")
+        print(f"  Output  : {out_path}")
+
+    def _notify(self, message: str) -> None:
+        if self._progress is not None:
+            self._progress.finish()
+        print(notice_line(message, config=self._config))

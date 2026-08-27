@@ -19,7 +19,10 @@ class _Layer:
 # Ordered from the lowest tier upwards: a module may import only from a layer listed before its
 # own. Add a module by naming it in its tier; add a tier by inserting a row at the right height.
 _LAYERS: tuple[_Layer, ...] = (
-    _Layer("commands", ("src", "src.boot", "src.explore", "src.report")),
+    _Layer("primitives", ("src", "src.escalation", "src.outcome", "src.terminal")),
+    _Layer("components", ("src.banner", "src.command", "src.progress")),
+    _Layer("runtime", ("src.frame",)),
+    _Layer("commands", ("src.boot", "src.explore", "src.report")),
     _Layer("entry point", ("splora",)),
 )
 

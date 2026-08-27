@@ -1,12 +1,30 @@
 # Splora
 
+**See where your disk went**
+
 Splora is a locally hosted, cross-platform file system data visualization tool.
 
 The tool provides a web-based, interactive drill-down feature representing a file system, along with textual and graphical information about files and folders throughout the file system tree. That information includes disk usage, number of files located in each folder, distribution of file extensions, and distribution of file categories (i.e. Image, Source, Binary, etc.).
 
 ## Installation
 
-Install Splora in editable mode to make the `splora` command available in your terminal:
+Requires Python 3.13 or later.
+
+Start by creating and activating the virtual environment:
+
+```
+python -m venv venv
+```
+
+```
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+```
+
+Then install Splora in editable mode to make the `splora` command available in your terminal:
 
 ```
 pip install -e .
@@ -32,9 +50,32 @@ splora report
 splora boot
 ```
 
+### Options Every Command Accepts
+
+Both flags are written *after* the subcommand they modify.
+
+| Option | Effect |
+|---|---|
+| `--trim-output` | Print only the result summary, leaving out the banner and the next-step advice. |
+| `--no-color` | Disable coloured output. Colour is switched off automatically when output is not a terminal, so a redirected or piped run is already plain. |
+
+### Exit Codes
+
+Each command reports what happened through its exit code, so a script can tell a complete run from a truncated one.
+
+| Meaning | Code |
+|---|---|
+| Success, including stopping `boot` with Ctrl+C | `0` |
+| User error, such as a missing path or an unknown run name | `1` |
+| Usage error, such as an unrecognised flag | `2` |
+| `explore` stopped early by `--max-files`, `--timeout`, or one Ctrl+C | `3` |
+| `explore` aborted by a second Ctrl+C, or `report` canceled part-built | `130` |
+
 ### Explore
 
 The `explore` command will traverse through the file system located under the given path and continuously write information about the filesystem into a JSON file. All JSON files are located in the [`data/filesystem`](data/filesystem) folder.
+
+While the scan runs, a live counter of files, elapsed time, size and throughput is redrawn in place. Pressing Ctrl+C once stops the scan and still writes what was gathered, flagged as a partial run. Pressing it a second time abandons the run and writes nothing.
 
 This command can be run with the following options:
 - `--name <run-name>` The title of the exploration run. Used as the filename for the JSON file and as the title in the HTML report. Defaults to the provided root folder name.
@@ -100,7 +141,7 @@ Useful flags:
 pytest -v                              # verbose output
 pytest test/unit/                      # unit tests only
 pytest test/integration/               # integration tests only
-pytest -k "test_fmt_bytes"             # run tests matching a name pattern
+pytest -k "format_bytes"               # run tests matching a name pattern
 ```
 
 ### End-to-end tests

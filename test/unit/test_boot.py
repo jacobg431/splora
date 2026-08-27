@@ -7,9 +7,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.boot import _find_free_port, _sanitize, _serve
+from src.boot import _POLL_INTERVAL, _find_free_port, _sanitize, _serve
 
 _SERVED_DIR = Path("/reports/my-run")
+
+
+def _stop_after(n: int):
+    """Return a should_stop callable that answers False n times, then True forever."""
+    calls = 0
+
+    def should_stop() -> bool:
+        nonlocal calls
+        calls += 1
+        return calls > n
+
+    return should_stop
 
 
 class TestSanitize:
@@ -74,54 +86,53 @@ class TestFindFreePort:
 
 
 class TestServe:
-    """Server startup, browser launch, and interrupt handling."""
+    """Server startup, polling, and browser launch."""
 
     def _make_httpd_mock(self):
-        """Build a mock HTTPServer that raises KeyboardInterrupt on serve_forever."""
+        """Build a mock HTTPServer whose handle_request returns instead of blocking."""
         httpd = MagicMock()
         httpd.__enter__ = MagicMock(return_value=httpd)
         httpd.__exit__ = MagicMock(return_value=False)
-        httpd.serve_forever.side_effect = KeyboardInterrupt
         return httpd
 
     def test_opens_browser_when_open_browser_is_true(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(_SERVED_DIR, 5050, open_browser=True)
+                _serve(_SERVED_DIR, 5050, should_stop=lambda: True, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:5050/")
 
     def test_does_not_open_browser_when_open_browser_is_false(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(_SERVED_DIR, 5050, open_browser=False)
+                _serve(_SERVED_DIR, 5050, should_stop=lambda: True, open_browser=False)
         mock_open.assert_not_called()
 
     def test_binds_to_localhost_on_given_port(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd) as MockServer:
             with patch("src.boot.webbrowser.open"):
-                _serve(_SERVED_DIR, 8080, open_browser=False)
+                _serve(_SERVED_DIR, 8080, should_stop=lambda: True, open_browser=False)
         MockServer.assert_called_once_with(("127.0.0.1", 8080), MockServer.call_args[0][1])
 
-    def test_serve_forever_is_called(self):
+    def test_sets_a_timeout_so_polling_never_blocks_forever(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open"):
-                _serve(_SERVED_DIR, 5050, open_browser=False)
-        httpd.serve_forever.assert_called_once()
+                _serve(_SERVED_DIR, 5050, should_stop=lambda: True, open_browser=False)
+        assert httpd.timeout == _POLL_INTERVAL
 
-    def test_keyboard_interrupt_is_handled_gracefully(self):
+    def test_handles_requests_until_told_to_stop(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open"):
-                # Should NOT propagate KeyboardInterrupt to the caller
-                _serve(_SERVED_DIR, 5050, open_browser=False)
+                _serve(_SERVED_DIR, 5050, should_stop=_stop_after(3), open_browser=False)
+        assert httpd.handle_request.call_count == 3
 
     def test_url_is_constructed_from_port(self):
         httpd = self._make_httpd_mock()
         with patch("src.boot.http.server.HTTPServer", return_value=httpd):
             with patch("src.boot.webbrowser.open") as mock_open:
-                _serve(_SERVED_DIR, 9999, open_browser=True)
+                _serve(_SERVED_DIR, 9999, should_stop=lambda: True, open_browser=True)
         mock_open.assert_called_once_with("http://localhost:9999/")

@@ -10,16 +10,66 @@ from pathlib import Path
 import pytest
 
 import src.report as report_mod
+from src.escalation import Cancel, Response
+from src.outcome import EXIT_OK
 from src.report import (
+    Report,
     _build_report,
     _latest_json,
     _missing_assets,
     _read_json,
     _resolve_json_path,
-    report,
+    _staging_dir,
 )
+from src.terminal import OutputConfig
 
+_TRIMMED = OutputConfig(trim=True, use_color=False)
+_DECORATED = OutputConfig(trim=False, use_color=False)
 _TEMPLATE_FILES = ("index.html", "style.css", "main.js")
+
+
+_REAL_COPYTREE = shutil.copytree
+_REAL_RMTREE = shutil.rmtree
+
+
+def _cancelling(press):
+    """Return a copytree stand-in that stages the tree in full and then presses once."""
+
+    def stage(src, dst, *_args, **_kwargs):
+        _REAL_COPYTREE(src, dst)
+        press(1)
+
+    return stage
+
+
+def _cancelling_removal_of(target: Path, command: Report):
+    """Return an rmtree stand-in that cancels the command as the target is being removed."""
+
+    def remove(path, *args, **kwargs):
+        if Path(path) == target:
+            command.cancel()
+        return _REAL_RMTREE(path, *args, **kwargs)
+
+    return remove
+
+
+def _raising(error: BaseException):
+    """Return a copytree stand-in that fails before anything is staged."""
+
+    def fail(*_args, **_kwargs):
+        raise error
+
+    return fail
+
+
+def _staged_then_raising(error: BaseException):
+    """Return a copytree stand-in that stages the tree in full and then fails."""
+
+    def fail(src, dst, *_args, **_kwargs):
+        _REAL_COPYTREE(src, dst)
+        raise error
+
+    return fail
 
 
 def _make_fs_json(fs_dir: Path, run_name: str, *, partial: bool = False) -> Path:
@@ -88,7 +138,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
-        report(name_args("my-run"))
+        Report(name_args("my-run"), _TRIMMED).run()
 
         out = report_dir / "my-run"
         assert (out / "index.html").exists()
@@ -100,7 +150,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         src_path = _make_fs_json(fs_dir, "my-run")
 
-        report(name_args("my-run"))
+        Report(name_args("my-run"), _TRIMMED).run()
 
         written = (report_dir / "my-run" / "data.json").read_text(encoding="utf-8")
         assert written == src_path.read_text(encoding="utf-8")
@@ -113,7 +163,7 @@ class TestReportCommand:
         time.sleep(0.02)
         _make_fs_json(fs_dir, "second")
 
-        report(name_args())  # no explicit name
+        Report(name_args(), _TRIMMED).run()  # no explicit name
 
         assert (report_dir / "second").exists()
         assert not (report_dir / "first").exists()
@@ -122,14 +172,14 @@ class TestReportCommand:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            report(name_args("does-not-exist"))
+            Report(name_args("does-not-exist"), _TRIMMED).run()
         assert exc.value.code == 1
 
     def test_empty_filesystem_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            report(name_args())
+            Report(name_args(), _TRIMMED).run()
         assert exc.value.code == 1
 
     def test_missing_template_file_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
@@ -138,7 +188,7 @@ class TestReportCommand:
         (template_dir / "style.css").unlink()
 
         with pytest.raises(SystemExit) as exc:
-            report(name_args("my-run"))
+            Report(name_args("my-run"), _TRIMMED).run()
         assert exc.value.code == 1
 
     def test_re_running_updates_existing_report(
@@ -147,7 +197,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
-        report(name_args("my-run"))
+        Report(name_args("my-run"), _TRIMMED).run()
 
         updated_payload = {
             "meta": {"name": "my-run", "partial": False, "total_files": 99, "root": "/new"},
@@ -155,7 +205,7 @@ class TestReportCommand:
         }
         (fs_dir / "my-run.json").write_text(json.dumps(updated_payload), encoding="utf-8")
 
-        report(name_args("my-run"))
+        Report(name_args("my-run"), _TRIMMED).run()
 
         data = load_json(report_dir / "my-run" / "data.json")
         assert data["meta"]["total_files"] == 99
@@ -166,7 +216,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "partial-run", partial=True)
 
-        report(name_args("partial-run"))
+        Report(name_args("partial-run"), _TRIMMED).run()
 
         assert (report_dir / "partial-run" / "data.json").exists()
 
@@ -174,7 +224,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "C_drive")  # stored with sanitized name
 
-        report(name_args("C:drive"))  # user passes unsanitized version
+        Report(name_args("C:drive"), _TRIMMED).run()  # user passes unsanitized version
 
         assert (report_dir / "C_drive").exists()
 
@@ -182,7 +232,7 @@ class TestReportCommand:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "clean-run")
 
-        report(name_args("clean-run"))
+        Report(name_args("clean-run"), _TRIMMED).run()
 
         top = {p.name for p in (report_dir / "clean-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "data.json"}
@@ -195,14 +245,14 @@ class TestReportCommand:
         (template_dir / "legacy").mkdir()
         (template_dir / "legacy" / "old-widget.js").write_text("// old", encoding="utf-8")
 
-        report(name_args("my-run"))
+        Report(name_args("my-run"), _TRIMMED).run()
         assert (report_dir / "my-run" / "legacy" / "old-widget.js").exists()
 
         shutil.rmtree(template_dir / "legacy")
         (template_dir / "core").mkdir()
         (template_dir / "core" / "widget.js").write_text("// widget", encoding="utf-8")
 
-        report(name_args("my-run"))
+        Report(name_args("my-run"), _TRIMMED).run()
 
         top = {p.name for p in (report_dir / "my-run").iterdir()}
         assert top == {"index.html", "style.css", "main.js", "core", "data.json"}
@@ -405,3 +455,222 @@ class TestBuildReport:
         _build_report(out_dir, template_dir, "{}")
 
         assert not (out_dir / "legacy").exists()
+
+
+class TestStaging:
+    """Assembly of a report beside its destination, and the cleanup that always follows."""
+
+    def test_the_staging_directory_is_a_sibling_of_the_destination(self, tmp_path: Path):
+        out_dir = tmp_path / "report" / "my-run"
+        assert _staging_dir(out_dir).parent == out_dir.parent
+
+    def test_the_staging_directory_is_dot_prefixed(self, tmp_path: Path):
+        assert _staging_dir(tmp_path / "report" / "my-run").name.startswith(".")
+
+    def test_no_staging_directory_survives_a_successful_build(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert not _staging_dir(out_dir).exists()
+
+    def test_nothing_is_staged_when_the_build_fails_before_copying(
+        self, tmp_path: Path, monkeypatch
+    ):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+        out_dir.parent.mkdir()
+        monkeypatch.setattr(report_mod.shutil, "copytree", _raising(OSError("disk full")))
+
+        with pytest.raises(OSError):
+            _build_report(out_dir, template_dir, "{}")
+
+        assert not _staging_dir(out_dir).exists()
+
+    def test_a_staged_tree_is_removed_when_the_build_fails_after_copying(
+        self, tmp_path: Path, monkeypatch
+    ):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+        out_dir.parent.mkdir()
+        monkeypatch.setattr(
+            report_mod.shutil, "copytree", _staged_then_raising(OSError("disk full"))
+        )
+
+        with pytest.raises(OSError):
+            _build_report(out_dir, template_dir, "{}")
+
+        assert not _staging_dir(out_dir).exists()
+
+    def test_a_failure_after_copying_leaves_the_report_root_clean(
+        self, tmp_path: Path, monkeypatch
+    ):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+        out_dir.parent.mkdir()
+        monkeypatch.setattr(
+            report_mod.shutil, "copytree", _staged_then_raising(OSError("disk full"))
+        )
+
+        with pytest.raises(OSError):
+            _build_report(out_dir, template_dir, "{}")
+
+        assert list(out_dir.parent.iterdir()) == []
+
+    def test_the_previous_report_survives_a_failed_rebuild(self, tmp_path: Path, monkeypatch):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+        _build_report(out_dir, template_dir, '{"v":1}')
+        monkeypatch.setattr(report_mod.shutil, "copytree", _raising(OSError("disk full")))
+
+        with pytest.raises(OSError):
+            _build_report(out_dir, template_dir, '{"v":2}')
+
+        assert (out_dir / "data.json").read_text(encoding="utf-8") == '{"v":1}'
+
+    def test_a_stale_staging_directory_does_not_leak_into_the_build(self, tmp_path: Path):
+        template_dir = _make_nested_template_dir(tmp_path)
+        out_dir = tmp_path / "report" / "my-run"
+        stale = _staging_dir(out_dir)
+        stale.mkdir(parents=True)
+        (stale / "junk.txt").write_text("leftover", encoding="utf-8")
+
+        _build_report(out_dir, template_dir, "{}")
+
+        assert not (out_dir / "junk.txt").exists()
+        assert not stale.exists()
+
+
+class TestCancel:
+    """A Ctrl+C arriving while the report is being assembled."""
+
+    def _cancelled(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, config=_TRIMMED
+    ):
+        fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        command = Report(name_args("my-run"), config)
+        monkeypatch.setattr(report_mod.shutil, "copytree", _cancelling(press))
+        with escalating_run(command):
+            with pytest.raises(Cancel):
+                command.run()
+        return report_dir
+
+    def test_leaves_no_staging_directory(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press
+    ):
+        report_dir = self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
+        assert not _staging_dir(report_dir / "my-run").exists()
+
+    def test_writes_no_report(self, tmp_path: Path, monkeypatch, name_args, escalating_run, press):
+        report_dir = self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
+        assert not (report_dir / "my-run").exists()
+
+    def test_says_it_was_canceled(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+    ):
+        self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
+        assert "Canceled." in capsys.readouterr().out
+
+    def test_the_trimmed_notice_is_the_bare_message(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+    ):
+        self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
+        assert capsys.readouterr().out.splitlines()[-1] == "Canceled."
+
+    def test_the_decorated_notice_carries_a_glyph(
+        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+    ):
+        self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press, config=_DECORATED)
+        assert capsys.readouterr().out.splitlines()[-1] == "! Canceled."
+
+
+class TestInterruptedSwap:
+    """An interrupt arriving in the moment a finished report replaces its predecessor."""
+
+    def _rebuilt(self, tmp_path: Path, monkeypatch, name_args):
+        fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        Report(name_args("my-run"), _TRIMMED).run()
+
+        out_dir = report_dir / "my-run"
+        command = Report(name_args("my-run"), _TRIMMED)
+        monkeypatch.setattr(report_mod.shutil, "rmtree", _cancelling_removal_of(out_dir, command))
+        return command.run(), out_dir
+
+    def test_the_report_is_completed(self, tmp_path: Path, monkeypatch, name_args):
+        _, out_dir = self._rebuilt(tmp_path, monkeypatch, name_args)
+        assert (out_dir / "data.json").exists()
+
+    def test_the_run_still_succeeds(self, tmp_path: Path, monkeypatch, name_args):
+        outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
+        assert outcome.code == EXIT_OK
+
+    def test_the_run_still_points_at_boot(self, tmp_path: Path, monkeypatch, name_args):
+        outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
+        assert outcome.next_step.command == "boot"
+
+    def test_it_says_the_interrupt_came_too_late(
+        self, tmp_path: Path, monkeypatch, name_args, capsys
+    ):
+        self._rebuilt(tmp_path, monkeypatch, name_args)
+        assert "The report was already complete; it was kept." in capsys.readouterr().out
+
+
+class TestOutcome:
+    """The result a completed report reports back to the frame."""
+
+    def test_a_successful_report_succeeds(self, tmp_path: Path, monkeypatch, name_args):
+        fs_dir, *_ = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        assert Report(name_args("my-run"), _TRIMMED).run().code == EXIT_OK
+
+    def test_a_successful_report_points_at_boot(self, tmp_path: Path, monkeypatch, name_args):
+        fs_dir, *_ = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        assert Report(name_args("my-run"), _TRIMMED).run().next_step.command == "boot"
+
+    def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch, name_args):
+        fs_dir, *_ = _patch(monkeypatch, tmp_path)
+        _make_fs_json(fs_dir, "my-run")
+        assert Report(name_args("my-run"), _TRIMMED).run().next_step.name == "my-run"
+
+
+def _report_building(tmp_path: Path, monkeypatch, name_args) -> Report:
+    fs_dir, *_ = _patch(monkeypatch, tmp_path)
+    _make_fs_json(fs_dir, "my-run")
+    return Report(name_args("my-run"), _TRIMMED)
+
+
+def _report_swapping(tmp_path: Path, monkeypatch, name_args) -> Report:
+    command = _report_building(tmp_path, monkeypatch, name_args)
+    command._entering_swap()
+    return command
+
+
+_CASES = [
+    pytest.param(_report_building, "cancel", Response.UNWIND, "Canceled.", id="building/cancel"),
+    pytest.param(_report_building, "abandon", Response.UNWIND, "Canceled.", id="building/abandon"),
+    pytest.param(_report_swapping, "cancel", Response.HANDLED, None, id="swapping/cancel"),
+    pytest.param(_report_swapping, "abandon", Response.HANDLED, None, id="swapping/abandon"),
+]
+
+
+class TestInterruptResponse:
+    """What cancel() and abandon() answer and print, in each phase."""
+
+    @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
+    def test_interrupt_response(
+        self,
+        make_command,
+        action,
+        expected,
+        notice,
+        tmp_path,
+        monkeypatch,
+        name_args,
+        assert_interrupt_response,
+    ):
+        command = make_command(tmp_path, monkeypatch, name_args)
+        assert_interrupt_response(command, action, expected, notice)

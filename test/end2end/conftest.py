@@ -7,7 +7,9 @@ All artifacts written to data/filesystem/ and data/report/ are deleted on teardo
 
 from __future__ import annotations
 
+import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -26,6 +28,7 @@ from src.report import _REPORT_DIR
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RUN_NAME = "splora-e2e"
 _PORT_START = 15000
+_READY_LINE = "Ready.\n"
 
 
 @dataclass(frozen=True)
@@ -56,7 +59,12 @@ def serve_dir() -> Callable[..., _Server]:
         port = _find_free_port(start=start_port)
         threading.Thread(
             target=_serve,
-            kwargs={"report_dir": report_dir, "port": port, "open_browser": False},
+            kwargs={
+                "report_dir": report_dir,
+                "port": port,
+                "should_stop": lambda: False,
+                "open_browser": False,
+            },
             daemon=True,
         ).start()
         _wait_until_listening(port)
@@ -89,6 +97,89 @@ def run_cli() -> Callable[..., None]:
         )
 
     return run
+
+
+@pytest.fixture(scope="session")
+def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
+    """Return a helper that runs the CLI and hands back its result whatever the exit code."""
+
+    def attempt(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, "splora.py", *args],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+        )
+
+    return attempt
+
+
+def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
+    """Block until the mock command process prints its readiness line."""
+    line = proc.stdout.readline()
+    if line != _READY_LINE:
+        raise AssertionError(f"mock command process did not print {_READY_LINE!r}; got {line!r}")
+
+
+@pytest.fixture
+def mock_command_process() -> Callable[..., subprocess.Popen[str]]:
+    """Return a helper that launches the mock command and waits for it to report ready."""
+    procs: list[subprocess.Popen[str]] = []
+
+    def launch(*, cancel: str = "handled", abandon: str = "unwind") -> subprocess.Popen[str]:
+        proc = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "test.end2end.mock_command",
+                "--cancel",
+                cancel,
+                "--abandon",
+                abandon,
+            ],
+            cwd=PROJECT_ROOT,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        procs.append(proc)
+        _wait_until_ready(proc)
+        return proc
+
+    yield launch
+
+    for proc in procs:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+
+
+@pytest.fixture
+def press() -> Callable[[subprocess.Popen[str]], None]:
+    """Return a helper that sends a real SIGINT to a live process."""
+
+    def send(proc: subprocess.Popen[str]) -> None:
+        os.kill(proc.pid, signal.SIGINT)
+
+    return send
+
+
+@pytest.fixture
+def scratch_run() -> Callable[[str], str]:
+    """Return a helper naming a run whose artifacts are deleted when the test ends."""
+    names: list[str] = []
+
+    def name(label: str) -> str:
+        run = f"e2e-{label}"
+        names.append(run)
+        return run
+
+    yield name
+
+    for run in names:
+        (_FS_DIR / f"{run}.json").unlink(missing_ok=True)
+        (_FS_DIR / f"{run}.tmp").unlink(missing_ok=True)
+        shutil.rmtree(_REPORT_DIR / run, ignore_errors=True)
+        shutil.rmtree(_REPORT_DIR / f".{run}.tmp", ignore_errors=True)
 
 
 @pytest.fixture(scope="session")
