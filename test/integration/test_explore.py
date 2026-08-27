@@ -45,6 +45,19 @@ def _scan_calling(*responses):
     return scan
 
 
+def _advancing_clock(step: float = 1.0):
+    """Return a time.monotonic() stand-in that advances by `step` seconds per call."""
+    now = 0.0
+
+    def monotonic() -> float:
+        nonlocal now
+        value = now
+        now += step
+        return value
+
+    return monotonic
+
+
 def _replace_calling(respond):
     """Return a Path.replace stand-in that invokes a response instead of renaming."""
 
@@ -152,12 +165,11 @@ class TestExploreCommand:
         assert data["meta"]["total_files"] <= 5
 
     def test_marks_partial_when_timeout_expires(self, tmp_path: Path, monkeypatch, load_json):
-        for i in range(200):
-            (tmp_path / f"file{i}.py").write_bytes(b"x" * 1000)
-
+        scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
+        monkeypatch.setattr(explore_mod.time, "monotonic", _advancing_clock())
 
-        Explore(_args(path=str(tmp_path), name="timeout-run", timeout=0.0001), _TRIMMED).run()
+        Explore(_args(path=str(scan), name="timeout-run", timeout=0.0001), _TRIMMED).run()
 
         data = load_json(out_dir / "timeout-run.json")
         assert data["meta"]["partial"] is True
@@ -420,8 +432,9 @@ class TestExitCodes:
     def test_stopping_on_timeout_is_partial(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        outcome = Explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED).run()
-        assert outcome.code == EXIT_PARTIAL
+        monkeypatch.setattr(explore_mod.time, "monotonic", _advancing_clock())
+        command = Explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED)
+        assert command.run().code == EXIT_PARTIAL
 
     def test_a_whole_scan_points_at_report(self, tmp_path: Path, monkeypatch):
         scan = _make_scan_tree(tmp_path)
