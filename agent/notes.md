@@ -43,9 +43,17 @@ only hides the fault.
 **Timing-dependent tests must fake the clock.** `explore`'s deadline is real wall-clock time,
 fixed when `Explore` is constructed. Tests that passed a tiny timeout and asserted on a partial
 result were racing the runner and failed intermittently on unchanged code. The fix is to
-monkeypatch `explore`'s `time.monotonic` with an advancing-sequence stand-in, installed before
-`Explore` is constructed, so the deadline is already past at the first check while the real
-path stays exercised.
+monkeypatch `time.monotonic` on the standard-library `time` module — the one `explore` reads
+the clock through — with an advancing-sequence stand-in, installed before `Explore` is
+constructed, so the deadline is already past at the first check while the real path stays
+exercised.
+
+**Patch a shared module where it is defined, not through another module's import.** Strict
+mypy (`no_implicit_reexport`) rejects `monkeypatch.setattr(explore_mod.time, ...)`,
+`report_mod.shutil`, and `banner_mod.metadata`: reaching a standard-library module through the
+importer's namespace. Import the module in the test and patch it directly
+(`import shutil; monkeypatch.setattr(shutil, "copytree", ...)`). It is the same object either
+way and `monkeypatch` still restores it; the `<module>_mod.<stdlib>` form was never more local.
 
 **A test may not buy timing margin with scale.** An earlier end-to-end test interrupted a real
 `explore` scan mid-traversal, which meant holding the scan open long enough to deliver a signal

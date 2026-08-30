@@ -3,9 +3,11 @@ from __future__ import annotations
 import io
 import re
 import tokenize
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+from test.lint.conftest import FailureMessage
 
 # Matched against comment tokens only, never against raw source text, so that the patterns
 # written here as string literals are not read back as violations of the rule they describe.
@@ -29,7 +31,7 @@ def _comments(text: str) -> Iterator[tokenize.TokenInfo]:
 
 
 def test_no_comment_switches_off_a_checker(
-    source_files: tuple[tuple[Path, str], ...], failure_message: Callable[..., str]
+    source_files: tuple[tuple[Path, str], ...], failure_message: FailureMessage
 ) -> None:
     offenders = [
         _Suppression(path=path, lineno=token.start[0], name=token.string)

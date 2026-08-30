@@ -9,12 +9,12 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from src.command import Command
 from src.escalation import Response
 from src.outcome import EXIT_ERROR, EXIT_OK, EXIT_PARTIAL, NextStep, Outcome
 from src.progress import Progress
+from src.record import Record, ScanNode
 from src.terminal import OutputConfig, format_bytes, notice_line
 
 # ── Extension → category mapping ───────────────────────────────────────────
@@ -189,8 +189,8 @@ def _scan_dir(
     excludes: set[str],
     state: _State,
     progress: Progress,
-) -> dict[str, Any]:
-    node: dict[str, Any] = {
+) -> ScanNode:
+    node: ScanNode = {
         "name": path.name or str(path),
         "path": str(path),
         "size": 0,
@@ -357,9 +357,7 @@ class Explore(Command):
             sys.exit(EXIT_ERROR)
         return root
 
-    def _record(
-        self, raw_name: str, root: Path, tree: dict[str, Any], elapsed: float
-    ) -> dict[str, Any]:
+    def _record(self, raw_name: str, root: Path, tree: ScanNode, elapsed: float) -> Record:
         return {
             "meta": {
                 "name": raw_name,
@@ -373,7 +371,7 @@ class Explore(Command):
             "tree": tree,
         }
 
-    def _write(self, out_path: Path, record: dict[str, Any]) -> None:
+    def _write(self, out_path: Path, record: Record) -> None:
         tmp_path = out_path.with_suffix(".tmp")
         try:
             tmp_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -381,7 +379,7 @@ class Explore(Command):
         finally:
             tmp_path.unlink(missing_ok=True)
 
-    def _summarize(self, out_path: Path, tree: dict[str, Any], elapsed: float) -> None:
+    def _summarize(self, out_path: Path, tree: ScanNode, elapsed: float) -> None:
         if self._cancelled:
             partial_note = " (partial -- stopped early)"
         elif self._state.stopped:

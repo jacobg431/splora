@@ -18,6 +18,7 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 
@@ -32,11 +33,48 @@ _READY_LINE = "Ready.\n"
 
 
 @dataclass(frozen=True)
-class _Server:
+class Server:
     """A report server listening in a background thread."""
 
     port: int
     url: str
+
+
+@dataclass(frozen=True)
+class Pipeline:
+    """The artifacts one full explore -> report -> boot run produced."""
+
+    scan_root: Path
+    run_name: str
+    json_path: Path
+    report_dir: Path
+    port: int
+    url: str
+    localhost_url: str
+
+
+class ServeDir(Protocol):
+    """Serves a directory in the background, returning once it accepts connections."""
+
+    def __call__(self, report_dir: Path, start_port: int = ...) -> Server: ...
+
+
+class RunCli(Protocol):
+    """Runs the splora CLI as a real subprocess and requires it to exit zero."""
+
+    def __call__(self, *args: str) -> None: ...
+
+
+class AttemptCli(Protocol):
+    """Runs the CLI as a real subprocess and returns its result whatever the exit code."""
+
+    def __call__(self, *args: str) -> subprocess.CompletedProcess[bytes]: ...
+
+
+class LaunchMock(Protocol):
+    """Launches the mock command subprocess and waits for it to report ready."""
+
+    def __call__(self, *, cancel: str = ..., abandon: str = ...) -> subprocess.Popen[str]: ...
 
 
 def _wait_until_listening(port: int, timeout: float = 5.0) -> None:
@@ -52,10 +90,10 @@ def _wait_until_listening(port: int, timeout: float = 5.0) -> None:
 
 
 @pytest.fixture(scope="session")
-def serve_dir() -> Callable[..., _Server]:
+def serve_dir() -> ServeDir:
     """Return a helper that serves a directory in the background once it accepts connections."""
 
-    def serve(report_dir: Path, start_port: int = _PORT_START) -> _Server:
+    def serve(report_dir: Path, start_port: int = _PORT_START) -> Server:
         port = _find_free_port(start=start_port)
         threading.Thread(
             target=_serve,
@@ -68,7 +106,7 @@ def serve_dir() -> Callable[..., _Server]:
             daemon=True,
         ).start()
         _wait_until_listening(port)
-        return _Server(port=port, url=f"http://127.0.0.1:{port}/")
+        return Server(port=port, url=f"http://127.0.0.1:{port}/")
 
     return serve
 
@@ -85,7 +123,7 @@ def _build_scan_tree(root: Path) -> None:
 
 
 @pytest.fixture(scope="session")
-def run_cli() -> Callable[..., None]:
+def run_cli() -> RunCli:
     """Return a helper that runs the splora CLI as a real subprocess."""
 
     def run(*args: str) -> None:
@@ -100,7 +138,7 @@ def run_cli() -> Callable[..., None]:
 
 
 @pytest.fixture(scope="session")
-def attempt_cli() -> Callable[..., subprocess.CompletedProcess[bytes]]:
+def attempt_cli() -> AttemptCli:
     """Return a helper that runs the CLI and hands back its result whatever the exit code."""
 
     def attempt(*args: str) -> subprocess.CompletedProcess[bytes]:
@@ -122,7 +160,7 @@ def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
 
 
 @pytest.fixture
-def mock_command_process() -> Iterator[Callable[..., subprocess.Popen[str]]]:
+def mock_command_process() -> Iterator[LaunchMock]:
     """Return a helper that launches the mock command and waits for it to report ready."""
     procs: list[subprocess.Popen[str]] = []
 
@@ -186,9 +224,9 @@ def scratch_run() -> Iterator[Callable[[str], str]]:
 @pytest.fixture(scope="session")
 def e2e_pipeline(
     tmp_path_factory: pytest.TempPathFactory,
-    run_cli: Callable[..., None],
-    serve_dir: Callable[..., _Server],
-) -> Iterator[dict[str, str | Path | int]]:
+    run_cli: RunCli,
+    serve_dir: ServeDir,
+) -> Iterator[Pipeline]:
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)
@@ -201,15 +239,15 @@ def e2e_pipeline(
 
     json_path = _FS_DIR / f"{RUN_NAME}.json"
 
-    yield {
-        "scan_root": scan_root,
-        "run_name": RUN_NAME,
-        "json_path": json_path,
-        "report_dir": report_dir,
-        "port": server.port,
-        "url": server.url,
-        "localhost_url": f"http://localhost:{server.port}/",
-    }
+    yield Pipeline(
+        scan_root=scan_root,
+        run_name=RUN_NAME,
+        json_path=json_path,
+        report_dir=report_dir,
+        port=server.port,
+        url=server.url,
+        localhost_url=f"http://localhost:{server.port}/",
+    )
 
     if json_path.exists():
         json_path.unlink()

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+
+from test.lint.conftest import FailureMessage
 
 _EXEMPT = Path("src") / "escalation.py"
 
@@ -37,7 +38,7 @@ def _except_handlers(tree: ast.Module) -> list[ast.ExceptHandler]:
 
 
 def test_no_broad_interrupt_catch_outside_escalation(
-    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: Callable[..., str]
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: FailureMessage
 ) -> None:
     offenders = [
         _Violation(path=path, lineno=handler.lineno, name=f"except {ast.unparse(handler.type)}")

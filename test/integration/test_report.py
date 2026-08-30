@@ -17,6 +17,7 @@ import src.report as report_mod
 from src.command import Command
 from src.escalation import Cancel, Response
 from src.outcome import EXIT_OK, Outcome
+from src.record import Record
 from src.report import (
     Report,
     _build_report,
@@ -229,7 +230,7 @@ class TestReportCommand:
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
         name_args: Callable[..., argparse.Namespace],
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -471,16 +472,15 @@ class TestBuildReport:
 
         assert out_dir.is_dir()
 
-    def test_idempotent_on_second_call(
-        self, tmp_path: Path, load_json: Callable[[Path], dict[str, Any]]
-    ) -> None:
+    def test_idempotent_on_second_call(self, tmp_path: Path) -> None:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report"
 
         _build_report(out_dir, template_dir, '{"v":1}')
         _build_report(out_dir, template_dir, '{"v":2}')
 
-        assert load_json(out_dir / "data.json")["v"] == 2
+        written = json.loads((out_dir / "data.json").read_text(encoding="utf-8"))
+        assert written["v"] == 2
 
     def test_no_extra_files_in_output(self, tmp_path: Path) -> None:
         template_dir = _make_nested_template_dir(tmp_path)

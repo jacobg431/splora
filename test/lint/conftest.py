@@ -15,9 +15,20 @@ _SCANNED_MODULES = ("splora.py",)
 class _Offender(Protocol):
     """A source location that a lint rule rejected."""
 
-    path: Path
-    lineno: int
-    name: str
+    @property
+    def path(self) -> Path:
+        """The repository-relative file the violation is in."""
+
+    @property
+    def lineno(self) -> int:
+        """The 1-indexed line the violation sits on."""
+
+    @property
+    def name(self) -> str:
+        """The offending construct, phrased in the rule's own terms."""
+
+
+FailureMessage = Callable[[str, Sequence[_Offender]], str]
 
 
 def _python_files() -> list[Path]:
@@ -49,7 +60,7 @@ def parsed_files(source_files: tuple[tuple[Path, str], ...]) -> tuple[tuple[Path
 
 
 @pytest.fixture(scope="session")
-def failure_message() -> Callable[[str, Sequence[_Offender]], str]:
+def failure_message() -> FailureMessage:
     """Return a helper that renders a lint failure as a problem and the locations breaking it."""
 
     def render(problem: str, offenders: Sequence[_Offender]) -> str:

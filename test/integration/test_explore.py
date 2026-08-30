@@ -19,6 +19,7 @@ from src.escalation import Abandon, Response
 from src.explore import Explore, _scan_dir, _State
 from src.outcome import EXIT_OK, EXIT_PARTIAL, Outcome
 from src.progress import Progress
+from src.record import Record, ScanNode
 from src.terminal import OutputConfig
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
@@ -39,10 +40,10 @@ def _make_scan_tree(parent: Path) -> Path:
     return scan
 
 
-def _scan_calling(*responses: Callable[[], object]) -> Callable[..., dict[str, object]]:
+def _scan_calling(*responses: Callable[[], object]) -> Callable[..., ScanNode]:
     """Return a _scan_dir stand-in that invokes the given responses before it scans."""
 
-    def scan(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    def scan(*args: Any, **kwargs: Any) -> ScanNode:
         for respond in responses:
             respond()
         return _REAL_SCAN_DIR(*args, **kwargs)
@@ -114,7 +115,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         # Keep scan_dir and out_dir as siblings so out_dir is never included in the scan.
         scan_dir = tmp_path / "scan"
@@ -143,7 +144,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         (tmp_path / "file.txt").write_bytes(b"x")
 
@@ -158,7 +159,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         (tmp_path / "small.bin").write_bytes(b"x" * 100)
         (tmp_path / "large.bin").write_bytes(b"y" * 900)
@@ -174,7 +175,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         for i in range(10):
             (tmp_path / f"file{i}.txt").write_bytes(b"x")
@@ -191,7 +192,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
@@ -206,7 +207,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         keep = tmp_path / "keep"
         keep.mkdir()
@@ -230,7 +231,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         # root/a/b/c/deep.txt is 3 levels deep; root/a/shallow.txt is 1 level deep
         deep = tmp_path / "a" / "b" / "c"
@@ -250,7 +251,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         (tmp_path / "photo.jpg").write_bytes(b"img")
         (tmp_path / "code.py").write_bytes(b"src")
@@ -286,7 +287,7 @@ class TestExploreCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         sub = tmp_path / "sub"
         sub.mkdir()
@@ -549,7 +550,7 @@ class TestCancelledScan:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         _, json_path = self._cancelled(tmp_path, monkeypatch)
         assert load_json(json_path)["meta"]["partial"] is True
@@ -608,7 +609,7 @@ class TestInterruptedCommit:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
     ) -> None:
         command, json_path = self._pressed(tmp_path, monkeypatch, "cancel")
         command.run()
@@ -624,7 +625,7 @@ class TestInterruptedCommit:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        load_json: Callable[[Path], dict[str, Any]],
+        load_json: Callable[[Path], Record],
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         command, json_path = self._pressed(tmp_path, monkeypatch, "cancel")

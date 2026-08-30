@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+
+from test.lint.conftest import FailureMessage
 
 
 @dataclass(frozen=True)
@@ -19,7 +21,7 @@ class _Layer:
 # Ordered from the lowest tier upwards: a module may import only from a layer listed before its
 # own. Add a module by naming it in its tier; add a tier by inserting a row at the right height.
 _LAYERS: tuple[_Layer, ...] = (
-    _Layer("primitives", ("src", "src.escalation", "src.outcome", "src.terminal")),
+    _Layer("primitives", ("src", "src.escalation", "src.outcome", "src.record", "src.terminal")),
     _Layer("components", ("src.banner", "src.command", "src.progress")),
     _Layer("runtime", ("src.frame",)),
     _Layer("commands", ("src.boot", "src.explore", "src.report")),
@@ -139,7 +141,7 @@ def imports(
 
 
 def test_imports_are_declared_at_module_level(
-    imports: tuple[_Import, ...], failure_message: Callable[..., str]
+    imports: tuple[_Import, ...], failure_message: FailureMessage
 ) -> None:
     offenders = [record for record in imports if record.is_nested]
     assert not offenders, failure_message("an import is declared inside a function", offenders)
@@ -162,7 +164,7 @@ def test_no_module_is_declared_in_two_layers(production_modules: frozenset[str])
 
 
 def test_modules_import_only_from_lower_layers(
-    imports: tuple[_Import, ...], failure_message: Callable[..., str]
+    imports: tuple[_Import, ...], failure_message: FailureMessage
 ) -> None:
     offenders: list[_Violation] = []
     for record in imports:

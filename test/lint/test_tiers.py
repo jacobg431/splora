@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+
+from test.lint.conftest import FailureMessage
 
 _UNIT_TIER = ("test", "unit")
 _DISALLOWED_FIXTURES = ("tmp_path", "tmp_path_factory")
@@ -79,7 +81,7 @@ def _tier(path: Path) -> str | None:
 
 
 def test_unit_tests_do_not_request_filesystem_fixtures(
-    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: Callable[..., str]
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: FailureMessage
 ) -> None:
     offenders: list[_Violation] = []
     for path, tree in parsed_files:
@@ -97,7 +99,7 @@ def test_unit_tests_do_not_request_filesystem_fixtures(
 
 
 def test_restricted_modules_are_imported_only_by_their_tier(
-    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: Callable[..., str]
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: FailureMessage
 ) -> None:
     offenders: list[_Violation] = []
     for path, tree in parsed_files:
