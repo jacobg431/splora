@@ -51,6 +51,9 @@ jobs:
       - name: Check linting
         run: ruff check .
 
+      - name: Check types
+        run: mypy src splora.py test
+
   format:
     name: Formatting
     runs-on: ubuntu-latest
