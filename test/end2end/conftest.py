@@ -100,10 +100,10 @@ def run_cli() -> Callable[..., None]:
 
 
 @pytest.fixture(scope="session")
-def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
+def attempt_cli() -> Callable[..., subprocess.CompletedProcess[bytes]]:
     """Return a helper that runs the CLI and hands back its result whatever the exit code."""
 
-    def attempt(*args: str) -> subprocess.CompletedProcess:
+    def attempt(*args: str) -> subprocess.CompletedProcess[bytes]:
         return subprocess.run(
             [sys.executable, "splora.py", *args],
             cwd=PROJECT_ROOT,
@@ -115,6 +115,7 @@ def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
 
 def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
     """Block until the mock command process prints its readiness line."""
+    assert proc.stdout is not None
     line = proc.stdout.readline()
     if line != _READY_LINE:
         raise AssertionError(f"mock command process did not print {_READY_LINE!r}; got {line!r}")

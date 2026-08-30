@@ -7,6 +7,7 @@ import shutil
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from src.command import Command
 from src.escalation import Response
@@ -54,7 +55,7 @@ def _resolve_json_path(name: str | None, fs_dir: Path) -> Path:
     return latest
 
 
-def _read_json(path: Path) -> tuple[str, dict]:
+def _read_json(path: Path) -> tuple[str, dict[str, Any]]:
     """Return a JSON file's raw text alongside its parsed content."""
     try:
         raw = path.read_text(encoding="utf-8")

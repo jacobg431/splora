@@ -8,6 +8,7 @@ import signal
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,10 +28,10 @@ def name_args() -> Callable[..., argparse.Namespace]:
 
 
 @pytest.fixture(scope="session")
-def load_json() -> Callable[[Path], dict]:
+def load_json() -> Callable[[Path], dict[str, Any]]:
     """Return a helper that parses a JSON file a command wrote."""
 
-    def load(path: Path) -> dict:
+    def load(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
 
     return load

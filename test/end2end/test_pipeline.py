@@ -13,18 +13,19 @@ import urllib.error
 import urllib.request
 from http.client import HTTPResponse
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from src.report import _TEMPLATE_DIR
 
 
-def _load_json(path: Path) -> dict:
+def _load_json(path: Path) -> dict[str, Any]:
     """Return the parsed contents of a JSON file."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _fetch(pipeline: dict, path: str = "") -> HTTPResponse:
+def _fetch(pipeline: dict[str, Any], path: str = "") -> HTTPResponse:
     """Request a path from the report server the pipeline started."""
     return urllib.request.urlopen(pipeline["url"] + path, timeout=5)
 

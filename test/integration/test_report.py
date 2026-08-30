@@ -622,6 +622,7 @@ class TestInterruptedSwap:
 
     def test_the_run_still_points_at_boot(self, tmp_path: Path, monkeypatch, name_args) -> None:
         outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
+        assert outcome.next_step is not None
         assert outcome.next_step.command == "boot"
 
     def test_it_says_the_interrupt_came_too_late(
@@ -644,12 +645,16 @@ class TestOutcome:
     ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
-        assert Report(name_args("my-run"), _TRIMMED).run().next_step.command == "boot"
+        outcome = Report(name_args("my-run"), _TRIMMED).run()
+        assert outcome.next_step is not None
+        assert outcome.next_step.command == "boot"
 
     def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch, name_args) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
-        assert Report(name_args("my-run"), _TRIMMED).run().next_step.name == "my-run"
+        outcome = Report(name_args("my-run"), _TRIMMED).run()
+        assert outcome.next_step is not None
+        assert outcome.next_step.name == "my-run"
 
 
 def _report_building(tmp_path: Path, monkeypatch, name_args) -> Report:

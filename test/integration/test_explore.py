@@ -7,6 +7,7 @@ import io
 import json
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -83,7 +84,7 @@ class _JsonCalling:
 
 def _args(**kwargs) -> argparse.Namespace:
     """Build an argparse.Namespace with sensible test defaults."""
-    defaults: dict = {
+    defaults: dict[str, Any] = {
         "path": None,
         "name": None,
         "depth": 0,
@@ -451,12 +452,14 @@ class TestExitCodes:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         outcome = Explore(_args(path=str(scan), name="whole"), _TRIMMED).run()
+        assert outcome.next_step is not None
         assert outcome.next_step.command == "report"
 
     def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         outcome = Explore(_args(path=str(scan), name="named-run"), _TRIMMED).run()
+        assert outcome.next_step is not None
         assert outcome.next_step.name == "named-run"
 
     def test_a_capped_scan_still_points_at_report(self, tmp_path: Path, monkeypatch) -> None:
@@ -498,6 +501,7 @@ class TestCancelledScan:
 
     def test_it_still_points_at_report(self, tmp_path: Path, monkeypatch) -> None:
         outcome, _ = self._cancelled(tmp_path, monkeypatch)
+        assert outcome.next_step is not None
         assert outcome.next_step.command == "report"
 
     def test_it_says_the_scan_stopped_early(self, tmp_path: Path, monkeypatch, capsys) -> None:
