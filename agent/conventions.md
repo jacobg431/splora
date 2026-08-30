@@ -77,6 +77,10 @@ The language version is **3.13** — no syntax or APIs that need a newer one or 
 - **Modules import downward only.** Each module in [`src/`](../src/) occupies a layer and may
   import only from a strictly lower one. In particular, no module is both a dependency sink and
   a composition root.
+- **Prefer object-oriented design and strongly typed objects.** A nested type annotation is a
+  code smell and should be flagged for refactoring into an appropriate class. Nesting beyond the
+  limit specified in [`test_annotations.py`](../test/lint/test_annotations.py) is illegal, as is
+  a callable type that hides its parameters behind `...` or an `Any` buried inside a larger type.
 
 ## Tests
 
