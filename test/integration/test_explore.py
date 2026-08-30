@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
@@ -194,7 +195,7 @@ class TestExploreCommand:
     ) -> None:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
-        monkeypatch.setattr(explore_mod.time, "monotonic", _advancing_clock())
+        monkeypatch.setattr(time, "monotonic", _advancing_clock())
 
         Explore(_args(path=str(scan), name="timeout-run", timeout=0.0001), _TRIMMED).run()
 
@@ -483,7 +484,7 @@ class TestExitCodes:
     ) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
-        monkeypatch.setattr(explore_mod.time, "monotonic", _advancing_clock())
+        monkeypatch.setattr(time, "monotonic", _advancing_clock())
         command = Explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED)
         assert command.run().code == EXIT_PARTIAL
 

@@ -536,7 +536,7 @@ class TestStaging:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
         out_dir.parent.mkdir()
-        monkeypatch.setattr(report_mod.shutil, "copytree", _raising(OSError("disk full")))
+        monkeypatch.setattr(shutil, "copytree", _raising(OSError("disk full")))
 
         with pytest.raises(OSError):
             _build_report(out_dir, template_dir, "{}")
@@ -549,9 +549,7 @@ class TestStaging:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
         out_dir.parent.mkdir()
-        monkeypatch.setattr(
-            report_mod.shutil, "copytree", _staged_then_raising(OSError("disk full"))
-        )
+        monkeypatch.setattr(shutil, "copytree", _staged_then_raising(OSError("disk full")))
 
         with pytest.raises(OSError):
             _build_report(out_dir, template_dir, "{}")
@@ -564,9 +562,7 @@ class TestStaging:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
         out_dir.parent.mkdir()
-        monkeypatch.setattr(
-            report_mod.shutil, "copytree", _staged_then_raising(OSError("disk full"))
-        )
+        monkeypatch.setattr(shutil, "copytree", _staged_then_raising(OSError("disk full")))
 
         with pytest.raises(OSError):
             _build_report(out_dir, template_dir, "{}")
@@ -579,7 +575,7 @@ class TestStaging:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
         _build_report(out_dir, template_dir, '{"v":1}')
-        monkeypatch.setattr(report_mod.shutil, "copytree", _raising(OSError("disk full")))
+        monkeypatch.setattr(shutil, "copytree", _raising(OSError("disk full")))
 
         with pytest.raises(OSError):
             _build_report(out_dir, template_dir, '{"v":2}')
@@ -614,7 +610,7 @@ class TestCancel:
         fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         command = Report(name_args("my-run"), config)
-        monkeypatch.setattr(report_mod.shutil, "copytree", _cancelling(press))
+        monkeypatch.setattr(shutil, "copytree", _cancelling(press))
         with escalating_run(command):
             with pytest.raises(Cancel):
                 command.run()
@@ -694,7 +690,7 @@ class TestInterruptedSwap:
 
         out_dir = report_dir / "my-run"
         command = Report(name_args("my-run"), _TRIMMED)
-        monkeypatch.setattr(report_mod.shutil, "rmtree", _cancelling_removal_of(out_dir, command))
+        monkeypatch.setattr(shutil, "rmtree", _cancelling_removal_of(out_dir, command))
         return command.run(), out_dir
 
     def test_the_report_is_completed(

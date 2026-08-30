@@ -29,8 +29,8 @@ def _visit(
 ) -> Iterator[_Definition]:
     """Yield the definitions declared directly or indirectly under a node."""
     for child in ast.iter_child_nodes(node):
-        is_function = isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
-        if is_function or isinstance(child, ast.ClassDef):
+        if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            is_function = isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
             yield _Definition(
                 path=path,
                 lineno=child.lineno,

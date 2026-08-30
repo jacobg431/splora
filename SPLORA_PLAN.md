@@ -19,14 +19,13 @@ This document outlines the features that Splora must have, and the progress towa
 | Unit tests | ✓ | 252 tests; pure, no filesystem or process I/O |
 | Integration tests | ✓ | 148 tests (2 skipped: symlink cases need elevated Windows privileges); filesystem I/O with path constants monkeypatched |
 | End-to-end tests | ✓ | 45 tests (4 skipped on Windows: POSIX-only signal delivery); real subprocesses + background HTTP server; artifacts deleted on teardown |
-| GitHub CI | ✓ | PR-triggered; ubuntu + windows runners; separate step per test tier; `ruff check` and `ruff format --check` |
+| GitHub CI | ✓ | PR-triggered; ubuntu + windows runners; separate step per test tier; `ruff check`, `ruff format --check`, and `mypy` (strict) |
 
 ---
 
 ## Deferred Features
 
 - Multi-run comparison view (display two exploration runs side by side)
-- Add mypy as CI step. It is already shipped via the project, but not currently enforced.
 - Windows delivery for the end-to-end interrupt tests. They currently cover POSIX signal delivery
   only — Windows needs `CTRL_C_EVENT` delivered to a dedicated process group instead of a plain
   `SIGINT`, which is materially more involved to set up correctly.

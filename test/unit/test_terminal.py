@@ -50,7 +50,7 @@ class TestOutputConfig:
     def test_is_immutable(self) -> None:
         config = OutputConfig(trim=False, use_color=True)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            config.trim = True
+            setattr(config, "trim", True)
 
     def test_declares_no_separate_no_color_field(self) -> None:
         fields = {f.name for f in dataclasses.fields(OutputConfig)}
@@ -227,4 +227,4 @@ class TestVirtualTerminal:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.delattr("ctypes.windll", raising=False)
-        assert enable_virtual_terminal() is None
+        enable_virtual_terminal()  # returns without touching the absent API

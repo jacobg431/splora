@@ -78,7 +78,7 @@ class _Watching(Command):
     """A command that records the SIGINT handler in place while it runs."""
 
     def __init__(self) -> None:
-        self.handler_while_running = None
+        self.handler_while_running: object = None
 
     def run(self) -> Outcome:
         """Record the installed handler, then report a successful run."""

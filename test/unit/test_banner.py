@@ -103,18 +103,18 @@ class TestVersionFallback:
         def absent(_name: str) -> str:
             raise metadata.PackageNotFoundError
 
-        monkeypatch.setattr(banner_mod.metadata, "version", absent)
+        monkeypatch.setattr(metadata, "version", absent)
         assert banner_mod.installed_version() == "0.1.0"
 
     def test_the_fallback_is_ascii(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def absent(_name: str) -> str:
             raise metadata.PackageNotFoundError
 
-        monkeypatch.setattr(banner_mod.metadata, "version", absent)
+        monkeypatch.setattr(metadata, "version", absent)
         assert banner_mod.installed_version().isascii()
 
     def test_reports_what_the_metadata_says_when_present(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(banner_mod.metadata, "version", lambda _name: "4.5.6")
+        monkeypatch.setattr(metadata, "version", lambda _name: "4.5.6")
         assert banner_mod.installed_version() == "4.5.6"

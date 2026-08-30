@@ -17,7 +17,8 @@ _REPO_ROOT = Path(__file__).parent.parent.parent
 def declared_version() -> str:
     """Return the version the project declares in its configuration file."""
     config = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return config["project"]["version"]
+    version: str = config["project"]["version"]
+    return version
 
 
 class TestInstalledVersion:

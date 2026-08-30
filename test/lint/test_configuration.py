@@ -30,7 +30,8 @@ def pyproject(repo_root: Path) -> dict[str, Any]:
 @pytest.fixture(scope="session")
 def testpaths(pyproject: dict[str, Any]) -> list[str]:
     """Return the test directories the default suite runs."""
-    return pyproject["tool"]["pytest"]["ini_options"]["testpaths"]
+    paths: list[str] = pyproject["tool"]["pytest"]["ini_options"]["testpaths"]
+    return paths
 
 
 def test_the_project_declares_no_runtime_dependencies(pyproject: dict[str, Any]) -> None:

@@ -23,12 +23,14 @@ from src.report import _TEMPLATE_DIR
 
 def _load_json(path: Path) -> dict[str, Any]:
     """Return the parsed contents of a JSON file."""
-    return json.loads(path.read_text(encoding="utf-8"))
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return data
 
 
 def _fetch(pipeline: dict[str, Any], path: str = "") -> HTTPResponse:
     """Request a path from the report server the pipeline started."""
-    return urllib.request.urlopen(pipeline["url"] + path, timeout=5)
+    response: HTTPResponse = urllib.request.urlopen(pipeline["url"] + path, timeout=5)
+    return response
 
 
 class TestExplore:

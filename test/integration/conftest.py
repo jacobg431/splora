@@ -32,7 +32,8 @@ def load_json() -> Callable[[Path], dict[str, Any]]:
     """Return a helper that parses a JSON file a command wrote."""
 
     def load(path: Path) -> dict[str, Any]:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return data
 
     return load
 
@@ -58,6 +59,7 @@ def press() -> Callable[[int], None]:
 
     def fire(times: int = 1) -> None:
         handler = signal.getsignal(signal.SIGINT)
+        assert callable(handler)
         for _ in range(times):
             handler(signal.SIGINT, None)
 

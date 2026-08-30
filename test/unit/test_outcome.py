@@ -50,7 +50,7 @@ class TestNextStep:
     def test_is_immutable(self) -> None:
         step = NextStep(command="report", name="my-run")
         with pytest.raises(dataclasses.FrozenInstanceError):
-            step.command = "boot"
+            setattr(step, "command", "boot")
 
 
 class TestOutcome:
@@ -69,4 +69,4 @@ class TestOutcome:
     def test_is_immutable(self) -> None:
         outcome = Outcome(code=EXIT_OK)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            outcome.code = EXIT_ERROR
+            setattr(outcome, "code", EXIT_ERROR)

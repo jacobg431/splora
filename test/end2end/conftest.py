@@ -15,10 +15,9 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -123,7 +122,7 @@ def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
 
 
 @pytest.fixture
-def mock_command_process() -> Callable[..., subprocess.Popen[str]]:
+def mock_command_process() -> Iterator[Callable[..., subprocess.Popen[str]]]:
     """Return a helper that launches the mock command and waits for it to report ready."""
     procs: list[subprocess.Popen[str]] = []
 
@@ -166,7 +165,7 @@ def press() -> Callable[[subprocess.Popen[str]], None]:
 
 
 @pytest.fixture
-def scratch_run() -> Callable[[str], str]:
+def scratch_run() -> Iterator[Callable[[str], str]]:
     """Return a helper naming a run whose artifacts are deleted when the test ends."""
     names: list[str] = []
 
@@ -188,8 +187,8 @@ def scratch_run() -> Callable[[str], str]:
 def e2e_pipeline(
     tmp_path_factory: pytest.TempPathFactory,
     run_cli: Callable[..., None],
-    serve_dir: Callable[..., Any],
-) -> dict[str, str | Path | int]:
+    serve_dir: Callable[..., _Server],
+) -> Iterator[dict[str, str | Path | int]]:
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)

@@ -43,6 +43,7 @@ class _Responses:
 
 def _press(times: int) -> None:
     handler = signal.getsignal(signal.SIGINT)
+    assert callable(handler)
     for _ in range(times):
         handler(signal.SIGINT, None)
 

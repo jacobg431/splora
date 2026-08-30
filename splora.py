@@ -1,13 +1,15 @@
 import argparse
+from collections.abc import Callable
 
 from src.boot import Boot
 from src.command import Command
 from src.explore import Explore
 from src.frame import run
 from src.report import Report
-from src.terminal import output_config
+from src.terminal import OutputConfig, output_config
 
-_COMMANDS: dict[str, type[Command]] = {"explore": Explore, "report": Report, "boot": Boot}
+_CommandFactory = Callable[[argparse.Namespace, OutputConfig], Command]
+_COMMANDS: dict[str, _CommandFactory] = {"explore": Explore, "report": Report, "boot": Boot}
 
 
 def _global_flags() -> argparse.ArgumentParser:
