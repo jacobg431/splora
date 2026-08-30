@@ -30,35 +30,35 @@ def _quiet() -> Progress:
 class TestSanitize:
     """Name sanitization applied to run names and output filenames."""
 
-    def test_valid_name_is_unchanged(self):
+    def test_valid_name_is_unchanged(self) -> None:
         assert _sanitize("my-project_v2") == "my-project_v2"
 
-    def test_replaces_colon(self):
+    def test_replaces_colon(self) -> None:
         assert _sanitize("C:drive") == "C_drive"
 
-    def test_replaces_backslash(self):
+    def test_replaces_backslash(self) -> None:
         assert _sanitize("a\\b") == "a_b"
 
-    def test_replaces_forward_slash(self):
+    def test_replaces_forward_slash(self) -> None:
         assert _sanitize("a/b") == "a_b"
 
-    def test_replaces_consecutive_unsafe_chars_with_single_underscore(self):
+    def test_replaces_consecutive_unsafe_chars_with_single_underscore(self) -> None:
         assert _sanitize("a<>b") == "a_b"
 
-    def test_strips_leading_dot(self):
+    def test_strips_leading_dot(self) -> None:
         assert _sanitize(".hidden") == "hidden"
 
-    def test_strips_trailing_space(self):
+    def test_strips_trailing_space(self) -> None:
         assert _sanitize("name ") == "name"
 
-    def test_empty_string_returns_unnamed(self):
+    def test_empty_string_returns_unnamed(self) -> None:
         assert _sanitize("") == "unnamed"
 
-    def test_only_unsafe_chars_collapses_to_single_underscore(self):
+    def test_only_unsafe_chars_collapses_to_single_underscore(self) -> None:
         # Consecutive unsafe chars become one "_"; "_" is a valid filename, not "unnamed"
         assert _sanitize(":::") == "_"
 
-    def test_preserves_unicode(self):
+    def test_preserves_unicode(self) -> None:
         assert _sanitize("données") == "données"
 
 
@@ -96,13 +96,13 @@ class TestCategories:
             (".env", "Config"),
         ],
     )
-    def test_known_extension_maps_to_correct_category(self, ext: str, expected: str):
+    def test_known_extension_maps_to_correct_category(self, ext: str, expected: str) -> None:
         assert CATEGORIES[ext] == expected
 
-    def test_unknown_extension_is_absent_from_map(self):
+    def test_unknown_extension_is_absent_from_map(self) -> None:
         assert ".splora" not in CATEGORIES
 
-    def test_all_values_are_valid_categories(self):
+    def test_all_values_are_valid_categories(self) -> None:
         valid = {
             "Image",
             "Video",
@@ -117,11 +117,11 @@ class TestCategories:
         }
         assert set(CATEGORIES.values()) == valid
 
-    def test_all_keys_are_lowercase(self):
+    def test_all_keys_are_lowercase(self) -> None:
         for key in CATEGORIES:
             assert key == key.lower(), f"Key {key!r} is not lowercase"
 
-    def test_all_keys_start_with_dot(self):
+    def test_all_keys_start_with_dot(self) -> None:
         for key in CATEGORIES:
             assert key.startswith("."), f"Key {key!r} does not start with '.'"
 
@@ -129,17 +129,17 @@ class TestCategories:
 class TestState:
     """Limit tracking that decides when a traversal stops."""
 
-    def test_initial_state_is_not_stopped(self):
+    def test_initial_state_is_not_stopped(self) -> None:
         assert not _State().stopped
         assert not _State().check()
 
-    def test_files_visited_increments_on_count_file(self):
+    def test_files_visited_increments_on_count_file(self) -> None:
         state = _State()
         state.count_file()
         state.count_file()
         assert state.files_visited == 2
 
-    def test_stops_when_max_files_reached(self):
+    def test_stops_when_max_files_reached(self) -> None:
         state = _State(max_files=3)
         state.count_file()
         state.count_file()
@@ -147,27 +147,27 @@ class TestState:
         state.count_file()
         assert state.stopped
 
-    def test_check_returns_true_after_stopped(self):
+    def test_check_returns_true_after_stopped(self) -> None:
         state = _State(max_files=1)
         state.count_file()
         assert state.check() is True
 
-    def test_stops_on_expired_deadline(self):
+    def test_stops_on_expired_deadline(self) -> None:
         state = _State(deadline=time.monotonic() - 1.0)  # already in the past
         assert state.check() is True
         assert state.stopped
 
-    def test_does_not_stop_on_future_deadline(self):
+    def test_does_not_stop_on_future_deadline(self) -> None:
         state = _State(deadline=time.monotonic() + 9999.0)
         assert state.check() is False
 
-    def test_no_limit_never_stops_from_counting(self):
+    def test_no_limit_never_stops_from_counting(self) -> None:
         state = _State()
         for _ in range(10_000):
             state.count_file()
         assert not state.stopped
 
-    def test_check_is_idempotent_after_stop(self):
+    def test_check_is_idempotent_after_stop(self) -> None:
         state = _State(max_files=1)
         state.count_file()
         assert state.check()
@@ -180,13 +180,13 @@ class TestResolveName:
     def _args(self, name: str | None = None) -> argparse.Namespace:
         return argparse.Namespace(name=name)
 
-    def test_explicit_name_takes_precedence(self):
+    def test_explicit_name_takes_precedence(self) -> None:
         assert _resolve_name(self._args("my-run"), Path("/data/projects")) == "my-run"
 
-    def test_falls_back_to_root_directory_name(self):
+    def test_falls_back_to_root_directory_name(self) -> None:
         assert _resolve_name(self._args(), Path("/data/my-folder")) == "my-folder"
 
-    def test_explicit_name_wins_even_when_root_has_a_name(self):
+    def test_explicit_name_wins_even_when_root_has_a_name(self) -> None:
         assert _resolve_name(self._args("override"), Path("/data/some-dir")) == "override"
 
 
@@ -198,31 +198,31 @@ class TestBuildExcludes:
     ) -> argparse.Namespace:
         return argparse.Namespace(exclude=exclude or [], no_default_excludes=no_default_excludes)
 
-    def test_user_excludes_are_included(self):
+    def test_user_excludes_are_included(self) -> None:
         args = self._args(exclude=["node_modules"], no_default_excludes=True)
         assert "node_modules" in _build_excludes(args)
 
-    def test_default_excludes_are_merged(self):
+    def test_default_excludes_are_merged(self) -> None:
         args = self._args(no_default_excludes=False)
         with patch.object(explore_mod, "_load_default_excludes", return_value={"venv", ".git"}):
             result = _build_excludes(args)
         assert "venv" in result
         assert ".git" in result
 
-    def test_no_default_excludes_skips_config_file(self):
+    def test_no_default_excludes_skips_config_file(self) -> None:
         args = self._args(no_default_excludes=True)
         with patch.object(explore_mod, "_load_default_excludes") as mock_load:
             _build_excludes(args)
         mock_load.assert_not_called()
 
-    def test_user_and_default_excludes_are_combined(self):
+    def test_user_and_default_excludes_are_combined(self) -> None:
         args = self._args(exclude=["custom"], no_default_excludes=False)
         with patch.object(explore_mod, "_load_default_excludes", return_value={"venv"}):
             result = _build_excludes(args)
         assert "custom" in result
         assert "venv" in result
 
-    def test_empty_exclude_list_returns_only_defaults(self):
+    def test_empty_exclude_list_returns_only_defaults(self) -> None:
         args = self._args(no_default_excludes=False)
         with patch.object(explore_mod, "_load_default_excludes", return_value={"default"}):
             result = _build_excludes(args)
@@ -237,23 +237,23 @@ class TestBuildState:
     ) -> argparse.Namespace:
         return argparse.Namespace(max_files=max_files, timeout=timeout)
 
-    def test_no_limits_produces_unlimited_state(self):
+    def test_no_limits_produces_unlimited_state(self) -> None:
         state = _build_state(self._args())
         assert state.max_files is None
         assert state.deadline is None
 
-    def test_max_files_is_passed_through(self):
+    def test_max_files_is_passed_through(self) -> None:
         state = _build_state(self._args(max_files=500))
         assert state.max_files == 500
 
-    def test_timeout_produces_a_future_deadline(self):
+    def test_timeout_produces_a_future_deadline(self) -> None:
         before = time.monotonic()
         state = _build_state(self._args(timeout=60.0))
         assert state.deadline is not None
         assert state.deadline > before
         assert state.deadline <= before + 61.0  # generous upper bound
 
-    def test_zero_timeout_is_treated_as_no_timeout(self):
+    def test_zero_timeout_is_treated_as_no_timeout(self) -> None:
         # timeout=0 is falsy, so no deadline should be set
         state = _build_state(self._args(timeout=0))
         assert state.deadline is None
@@ -262,7 +262,7 @@ class TestBuildState:
 class TestScanDir:
     """Recursive directory scanning when the directory cannot be listed."""
 
-    def test_permission_error_returns_empty_node(self):
+    def test_permission_error_returns_empty_node(self) -> None:
         # Simulate a directory that cannot be listed
         with patch("os.scandir", side_effect=PermissionError("denied")):
             node = _scan_dir(

@@ -12,7 +12,7 @@ import pytest
 class TestHttpServing:
     """Responses served over HTTP from a report directory."""
 
-    def test_serve_returns_http_200_for_index(self, tmp_path: Path, serve_dir):
+    def test_serve_returns_http_200_for_index(self, tmp_path: Path, serve_dir) -> None:
         (tmp_path / "index.html").write_text("<h1>Splora</h1>", encoding="utf-8")
 
         server = serve_dir(tmp_path, 19200)
@@ -20,7 +20,7 @@ class TestHttpServing:
         resp = urllib.request.urlopen(server.url, timeout=3)
         assert resp.status == 200
 
-    def test_serve_returns_correct_file_content(self, tmp_path: Path, serve_dir):
+    def test_serve_returns_correct_file_content(self, tmp_path: Path, serve_dir) -> None:
         content = "<h1>hello splora</h1>"
         (tmp_path / "index.html").write_text(content, encoding="utf-8")
 
@@ -29,14 +29,14 @@ class TestHttpServing:
         body = urllib.request.urlopen(server.url, timeout=3).read()
         assert content.encode() in body
 
-    def test_serve_returns_404_for_missing_file(self, tmp_path: Path, serve_dir):
+    def test_serve_returns_404_for_missing_file(self, tmp_path: Path, serve_dir) -> None:
         server = serve_dir(tmp_path, 19240)
 
         with pytest.raises(urllib.error.HTTPError) as exc:
             urllib.request.urlopen(server.url + "missing.html", timeout=3)
         assert exc.value.code == 404
 
-    def test_serve_only_serves_from_report_dir(self, tmp_path: Path, serve_dir):
+    def test_serve_only_serves_from_report_dir(self, tmp_path: Path, serve_dir) -> None:
         report_dir = tmp_path / "report"
         report_dir.mkdir()
         (report_dir / "page.html").write_text("inside", encoding="utf-8")

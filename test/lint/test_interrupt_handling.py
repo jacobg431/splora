@@ -35,7 +35,7 @@ def _except_handlers(tree: ast.Module) -> list[ast.ExceptHandler]:
     return [node for node in ast.walk(tree) if isinstance(node, ast.ExceptHandler)]
 
 
-def test_no_broad_interrupt_catch_outside_escalation(parsed_files, failure_message):
+def test_no_broad_interrupt_catch_outside_escalation(parsed_files, failure_message) -> None:
     offenders = [
         _Violation(path=path, lineno=handler.lineno, name=f"except {ast.unparse(handler.type)}")
         for path, tree in parsed_files

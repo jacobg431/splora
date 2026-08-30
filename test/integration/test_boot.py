@@ -35,7 +35,7 @@ class TestBootCommand:
 
     def test_calls_serve_with_correct_directory_and_port(
         self, tmp_path: Path, monkeypatch, name_args
-    ):
+    ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
 
@@ -47,7 +47,7 @@ class TestBootCommand:
 
     def test_resolves_latest_report_when_no_name_given(
         self, tmp_path: Path, monkeypatch, name_args
-    ):
+    ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "first").mkdir()
         time.sleep(0.02)
@@ -61,7 +61,7 @@ class TestBootCommand:
 
     def test_name_sanitization_resolves_correct_directory(
         self, tmp_path: Path, monkeypatch, name_args
-    ):
+    ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "C_drive").mkdir()
 
@@ -71,21 +71,21 @@ class TestBootCommand:
 
         mock_serve.assert_called_once_with(report_dir / "C_drive", 9001, should_stop=ANY)
 
-    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
+    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args) -> None:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
             Boot(name_args("nonexistent"), _TRIMMED).run()
         assert exc.value.code == 1
 
-    def test_empty_report_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args):
+    def test_empty_report_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args) -> None:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
             Boot(name_args(), _TRIMMED).run()
         assert exc.value.code == 1
 
-    def test_port_is_found_before_serve_is_called(self, tmp_path: Path, monkeypatch, name_args):
+    def test_port_is_found_before_serve_is_called(self, tmp_path: Path, monkeypatch, name_args) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
 
@@ -108,12 +108,12 @@ class TestBootCommand:
 class TestStopping:
     """How the command ends once the user interrupts the server it started."""
 
-    def _served(self, tmp_path: Path, monkeypatch, name_args, action: str):
+    def _served(self, tmp_path: Path, monkeypatch, name_args, action: str) -> Response:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
         command = Boot(name_args("my-run"), _TRIMMED)
 
-        def fake_serve(_report_dir, _port, *, should_stop, **_kwargs):
+        def fake_serve(_report_dir, _port, *, should_stop, **_kwargs) -> None:
             getattr(command, action)()
             assert should_stop()
 
@@ -121,13 +121,13 @@ class TestStopping:
             with patch.object(boot_mod, "_serve", side_effect=fake_serve):
                 return command.run()
 
-    def test_a_cancel_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args):
+    def test_a_cancel_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").code == EXIT_OK
 
-    def test_a_cancel_offers_no_next_step(self, tmp_path: Path, monkeypatch, name_args):
+    def test_a_cancel_offers_no_next_step(self, tmp_path: Path, monkeypatch, name_args) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").next_step is None
 
-    def test_an_abandon_also_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args):
+    def test_an_abandon_also_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "abandon").code == EXIT_OK
 
 
@@ -147,7 +147,7 @@ class TestInterruptResponse:
     @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
     def test_interrupt_response(
         self, make_command, action, expected, notice, name_args, assert_interrupt_response
-    ):
+    ) -> None:
         command = make_command(name_args)
         assert_interrupt_response(command, action, expected, notice)
 
@@ -155,21 +155,21 @@ class TestInterruptResponse:
 class TestLatestReport:
     """Selection of the most recently modified report directory."""
 
-    def test_nonexistent_report_dir_returns_none(self, tmp_path: Path):
+    def test_nonexistent_report_dir_returns_none(self, tmp_path: Path) -> None:
         assert _latest_report(tmp_path / "does-not-exist") is None
 
-    def test_empty_report_dir_returns_none(self, tmp_path: Path):
+    def test_empty_report_dir_returns_none(self, tmp_path: Path) -> None:
         assert _latest_report(tmp_path) is None
 
-    def test_single_subdirectory_is_returned(self, tmp_path: Path):
+    def test_single_subdirectory_is_returned(self, tmp_path: Path) -> None:
         (tmp_path / "run-a").mkdir()
         assert _latest_report(tmp_path) == tmp_path / "run-a"
 
-    def test_files_in_report_dir_are_ignored(self, tmp_path: Path):
+    def test_files_in_report_dir_are_ignored(self, tmp_path: Path) -> None:
         (tmp_path / "stray.json").write_text("{}", encoding="utf-8")
         assert _latest_report(tmp_path) is None
 
-    def test_returns_most_recently_modified_dir(self, tmp_path: Path):
+    def test_returns_most_recently_modified_dir(self, tmp_path: Path) -> None:
         old = tmp_path / "old-run"
         old.mkdir()
         time.sleep(0.02)
@@ -177,7 +177,7 @@ class TestLatestReport:
         new.mkdir()
         assert _latest_report(tmp_path) == new
 
-    def test_ignores_nested_subdirectories(self, tmp_path: Path):
+    def test_ignores_nested_subdirectories(self, tmp_path: Path) -> None:
         parent = tmp_path / "run-a"
         parent.mkdir()
         (parent / "nested").mkdir()
@@ -188,37 +188,37 @@ class TestLatestReport:
 class TestResolveReportDir:
     """Resolution of a report directory by name or by recency."""
 
-    def test_named_dir_that_exists_is_returned(self, tmp_path: Path):
+    def test_named_dir_that_exists_is_returned(self, tmp_path: Path) -> None:
         (tmp_path / "my-run").mkdir()
         assert _resolve_report_dir("my-run", tmp_path) == tmp_path / "my-run"
 
-    def test_name_is_sanitized_before_lookup(self, tmp_path: Path):
+    def test_name_is_sanitized_before_lookup(self, tmp_path: Path) -> None:
         (tmp_path / "C_drive").mkdir()
         assert _resolve_report_dir("C:drive", tmp_path) == tmp_path / "C_drive"
 
-    def test_named_dir_missing_exits_with_code_1(self, tmp_path: Path):
+    def test_named_dir_missing_exits_with_code_1(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
             _resolve_report_dir("nonexistent", tmp_path)
         assert exc.value.code == 1
 
-    def test_named_path_that_is_a_file_exits_with_code_1(self, tmp_path: Path):
+    def test_named_path_that_is_a_file_exits_with_code_1(self, tmp_path: Path) -> None:
         (tmp_path / "not-a-dir").write_text("x", encoding="utf-8")
         with pytest.raises(SystemExit) as exc:
             _resolve_report_dir("not-a-dir", tmp_path)
         assert exc.value.code == 1
 
-    def test_no_name_returns_latest_dir(self, tmp_path: Path):
+    def test_no_name_returns_latest_dir(self, tmp_path: Path) -> None:
         (tmp_path / "first").mkdir()
         time.sleep(0.02)
         (tmp_path / "second").mkdir()
         assert _resolve_report_dir(None, tmp_path) == tmp_path / "second"
 
-    def test_no_name_empty_dir_exits_with_code_1(self, tmp_path: Path):
+    def test_no_name_empty_dir_exits_with_code_1(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
             _resolve_report_dir(None, tmp_path)
         assert exc.value.code == 1
 
-    def test_no_name_nonexistent_report_dir_exits_with_code_1(self, tmp_path: Path):
+    def test_no_name_nonexistent_report_dir_exits_with_code_1(self, tmp_path: Path) -> None:
         with pytest.raises(SystemExit) as exc:
             _resolve_report_dir(None, tmp_path / "missing")
         assert exc.value.code == 1
@@ -227,21 +227,21 @@ class TestResolveReportDir:
 class TestStagingDirectoriesAreIgnored:
     """A report still being staged must never be mistaken for one ready to serve."""
 
-    def test_finished_reports_excludes_a_staging_directory(self, tmp_path: Path):
+    def test_finished_reports_excludes_a_staging_directory(self, tmp_path: Path) -> None:
         (tmp_path / "run-a").mkdir()
         (tmp_path / ".run-a.tmp").mkdir()
         assert _finished_reports(tmp_path) == [tmp_path / "run-a"]
 
-    def test_finished_reports_excludes_files(self, tmp_path: Path):
+    def test_finished_reports_excludes_files(self, tmp_path: Path) -> None:
         (tmp_path / "run-a").mkdir()
         (tmp_path / "stray.json").write_text("{}", encoding="utf-8")
         assert _finished_reports(tmp_path) == [tmp_path / "run-a"]
 
-    def test_finished_reports_is_empty_when_only_staging_remains(self, tmp_path: Path):
+    def test_finished_reports_is_empty_when_only_staging_remains(self, tmp_path: Path) -> None:
         (tmp_path / ".run-a.tmp").mkdir()
         assert _finished_reports(tmp_path) == []
 
-    def test_a_newer_staging_directory_is_not_chosen_as_the_latest(self, tmp_path: Path):
+    def test_a_newer_staging_directory_is_not_chosen_as_the_latest(self, tmp_path: Path) -> None:
         finished = tmp_path / "run-a"
         finished.mkdir()
         staging = tmp_path / ".run-a.tmp"
@@ -250,13 +250,13 @@ class TestStagingDirectoriesAreIgnored:
         _set_mtime(staging, 2_000_000)
         assert _latest_report(tmp_path) == finished
 
-    def test_only_staging_directories_resolve_to_nothing(self, tmp_path: Path):
+    def test_only_staging_directories_resolve_to_nothing(self, tmp_path: Path) -> None:
         (tmp_path / ".run-a.tmp").mkdir()
         assert _latest_report(tmp_path) is None
 
     def test_resolving_without_a_name_skips_a_newer_staging_directory(
         self, tmp_path: Path, monkeypatch
-    ):
+    ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         finished = report_dir / "run-a"
         finished.mkdir()
@@ -266,7 +266,7 @@ class TestStagingDirectoriesAreIgnored:
         _set_mtime(staging, 2_000_000)
         assert _resolve_report_dir(None, report_dir) == finished
 
-    def test_a_staging_directory_alone_leaves_nothing_to_serve(self, tmp_path: Path, monkeypatch):
+    def test_a_staging_directory_alone_leaves_nothing_to_serve(self, tmp_path: Path, monkeypatch) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / ".run-a.tmp").mkdir()
         with pytest.raises(SystemExit) as exc:

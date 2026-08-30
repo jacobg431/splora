@@ -34,7 +34,7 @@ def _make_scan_tree(parent: Path) -> Path:
     return scan
 
 
-def _scan_calling(*responses):
+def _scan_calling(*responses) -> explore_mod._scan_dir:
     """Return a _scan_dir stand-in that invokes the given responses before it scans."""
 
     def scan(*args, **kwargs):
@@ -45,7 +45,7 @@ def _scan_calling(*responses):
     return scan
 
 
-def _advancing_clock(step: float = 1.0):
+def _advancing_clock(step: float = 1.0) -> callable:
     """Return a time.monotonic() stand-in that advances by `step` seconds per call."""
     now = 0.0
 
@@ -58,7 +58,7 @@ def _advancing_clock(step: float = 1.0):
     return monotonic
 
 
-def _replace_calling(respond):
+def _replace_calling(respond) -> callable:
     """Return a Path.replace stand-in that invokes a response instead of renaming."""
 
     def replace(_self, _target):
@@ -73,7 +73,7 @@ class _JsonCalling:
     def __init__(self, *responses):
         self._responses = responses
 
-    def dumps(self, *args, **kwargs):
+    def dumps(self, *args, **kwargs) -> str:
         """Invoke every response, then serialise exactly as the real module would."""
         for respond in self._responses:
             respond()
@@ -107,7 +107,7 @@ class TestExploreCommand:
 
     def test_generates_valid_json_with_correct_structure(
         self, tmp_path: Path, monkeypatch, load_json
-    ):
+    ) -> None:
         # Keep scan_dir and out_dir as siblings so out_dir is never included in the scan.
         scan_dir = tmp_path / "scan"
         scan_dir.mkdir()
@@ -131,7 +131,7 @@ class TestExploreCommand:
         assert len(data["tree"]["children"]) == 1
         assert data["tree"]["children"][0]["name"] == "subdir"
 
-    def test_name_defaults_to_root_folder_name(self, tmp_path: Path, monkeypatch, load_json):
+    def test_name_defaults_to_root_folder_name(self, tmp_path: Path, monkeypatch, load_json) -> None:
         (tmp_path / "file.txt").write_bytes(b"x")
 
         out_dir = _patch(monkeypatch, tmp_path)
@@ -141,7 +141,7 @@ class TestExploreCommand:
         data = load_json(out_dir / f"{tmp_path.name}.json")
         assert data["meta"]["name"] == tmp_path.name
 
-    def test_total_size_is_accurate(self, tmp_path: Path, monkeypatch, load_json):
+    def test_total_size_is_accurate(self, tmp_path: Path, monkeypatch, load_json) -> None:
         (tmp_path / "small.bin").write_bytes(b"x" * 100)
         (tmp_path / "large.bin").write_bytes(b"y" * 900)
 
@@ -152,7 +152,7 @@ class TestExploreCommand:
         data = load_json(out_dir / "size-run.json")
         assert data["meta"]["total_size"] == 1000
 
-    def test_marks_partial_when_max_files_reached(self, tmp_path: Path, monkeypatch, load_json):
+    def test_marks_partial_when_max_files_reached(self, tmp_path: Path, monkeypatch, load_json) -> None:
         for i in range(10):
             (tmp_path / f"file{i}.txt").write_bytes(b"x")
 
@@ -164,7 +164,7 @@ class TestExploreCommand:
         assert data["meta"]["partial"] is True
         assert data["meta"]["total_files"] <= 5
 
-    def test_marks_partial_when_timeout_expires(self, tmp_path: Path, monkeypatch, load_json):
+    def test_marks_partial_when_timeout_expires(self, tmp_path: Path, monkeypatch, load_json) -> None:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         monkeypatch.setattr(explore_mod.time, "monotonic", _advancing_clock())
@@ -174,7 +174,7 @@ class TestExploreCommand:
         data = load_json(out_dir / "timeout-run.json")
         assert data["meta"]["partial"] is True
 
-    def test_respects_exclude_list(self, tmp_path: Path, monkeypatch, load_json):
+    def test_respects_exclude_list(self, tmp_path: Path, monkeypatch, load_json) -> None:
         keep = tmp_path / "keep"
         keep.mkdir()
         (keep / "file.txt").write_bytes(b"x")
@@ -193,7 +193,7 @@ class TestExploreCommand:
         assert "node_modules" not in child_names
         assert "keep" in child_names
 
-    def test_depth_limit_prevents_deep_traversal(self, tmp_path: Path, monkeypatch, load_json):
+    def test_depth_limit_prevents_deep_traversal(self, tmp_path: Path, monkeypatch, load_json) -> None:
         # root/a/b/c/deep.txt is 3 levels deep; root/a/shallow.txt is 1 level deep
         deep = tmp_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
@@ -210,7 +210,7 @@ class TestExploreCommand:
 
     def test_extension_and_category_distribution_in_output(
         self, tmp_path: Path, monkeypatch, load_json
-    ):
+    ) -> None:
         (tmp_path / "photo.jpg").write_bytes(b"img")
         (tmp_path / "code.py").write_bytes(b"src")
         (tmp_path / "archive.zip").write_bytes(b"zip")
@@ -228,7 +228,7 @@ class TestExploreCommand:
         assert tree["categories"]["Source Code"] == 1
         assert tree["categories"]["Archive"] == 1
 
-    def test_output_file_is_not_written_as_partial_tmp(self, tmp_path: Path, monkeypatch):
+    def test_output_file_is_not_written_as_partial_tmp(self, tmp_path: Path, monkeypatch) -> None:
         (tmp_path / "file.txt").write_bytes(b"x")
 
         out_dir = _patch(monkeypatch, tmp_path)
@@ -239,7 +239,7 @@ class TestExploreCommand:
         assert (out_dir / "atomic-run.json").exists()
         assert not (out_dir / "atomic-run.tmp").exists()
 
-    def test_child_stats_are_aggregated_to_root(self, tmp_path: Path, monkeypatch, load_json):
+    def test_child_stats_are_aggregated_to_root(self, tmp_path: Path, monkeypatch, load_json) -> None:
         sub = tmp_path / "sub"
         sub.mkdir()
         (sub / "a.py").write_bytes(b"x" * 50)
@@ -260,7 +260,7 @@ class TestExploreCommand:
 class TestScanDir:
     """Recursive directory scanning and aggregation of child statistics."""
 
-    def test_empty_directory_returns_zero_counts(self, tmp_path: Path):
+    def test_empty_directory_returns_zero_counts(self, tmp_path: Path) -> None:
         node = _scan_dir(
             tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
         )
@@ -270,14 +270,14 @@ class TestScanDir:
         assert node["extensions"] == {}
         assert node["categories"] == {}
 
-    def test_node_carries_correct_name_and_path(self, tmp_path: Path):
+    def test_node_carries_correct_name_and_path(self, tmp_path: Path) -> None:
         node = _scan_dir(
             tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
         )
         assert node["name"] == tmp_path.name
         assert node["path"] == str(tmp_path)
 
-    def test_counts_files_and_accumulates_size(self, tmp_path: Path):
+    def test_counts_files_and_accumulates_size(self, tmp_path: Path) -> None:
         (tmp_path / "a.txt").write_bytes(b"hello")  # 5 bytes
         (tmp_path / "b.txt").write_bytes(b"world!")  # 6 bytes
         node = _scan_dir(
@@ -286,7 +286,7 @@ class TestScanDir:
         assert node["file_count"] == 2
         assert node["size"] == 11
 
-    def test_recurses_and_aggregates_child_stats(self, tmp_path: Path):
+    def test_recurses_and_aggregates_child_stats(self, tmp_path: Path) -> None:
         sub = tmp_path / "sub"
         sub.mkdir()
         (sub / "code.py").write_bytes(b"x" * 100)
@@ -299,7 +299,7 @@ class TestScanDir:
         assert len(node["children"]) == 1
         assert node["children"][0]["name"] == "sub"
 
-    def test_assigns_correct_extension_keys(self, tmp_path: Path):
+    def test_assigns_correct_extension_keys(self, tmp_path: Path) -> None:
         (tmp_path / "image.jpg").write_bytes(b"img")
         (tmp_path / "script.py").write_bytes(b"code")
         node = _scan_dir(
@@ -308,7 +308,7 @@ class TestScanDir:
         assert node["extensions"][".jpg"] == 1
         assert node["extensions"][".py"] == 1
 
-    def test_assigns_correct_categories(self, tmp_path: Path):
+    def test_assigns_correct_categories(self, tmp_path: Path) -> None:
         (tmp_path / "image.jpg").write_bytes(b"img")
         (tmp_path / "script.py").write_bytes(b"code")
         node = _scan_dir(
@@ -317,7 +317,7 @@ class TestScanDir:
         assert node["categories"]["Image"] == 1
         assert node["categories"]["Source Code"] == 1
 
-    def test_no_extension_uses_none_key(self, tmp_path: Path):
+    def test_no_extension_uses_none_key(self, tmp_path: Path) -> None:
         (tmp_path / "Makefile").write_bytes(b"make")
         node = _scan_dir(
             tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
@@ -325,14 +325,14 @@ class TestScanDir:
         assert node["extensions"]["(none)"] == 1
         assert node["categories"]["Other"] == 1
 
-    def test_unknown_extension_maps_to_other(self, tmp_path: Path):
+    def test_unknown_extension_maps_to_other(self, tmp_path: Path) -> None:
         (tmp_path / "file.splora").write_bytes(b"x")
         node = _scan_dir(
             tmp_path, depth=0, depth_limit=0, excludes=set(), state=_State(), progress=_quiet()
         )
         assert node["categories"]["Other"] == 1
 
-    def test_respects_exclude_list(self, tmp_path: Path):
+    def test_respects_exclude_list(self, tmp_path: Path) -> None:
         ignored = tmp_path / "node_modules"
         ignored.mkdir()
         (ignored / "big.js").write_bytes(b"x" * 1000)
@@ -347,7 +347,7 @@ class TestScanDir:
         assert node["file_count"] == 0
         assert node["children"] == []
 
-    def test_respects_depth_limit(self, tmp_path: Path):
+    def test_respects_depth_limit(self, tmp_path: Path) -> None:
         # Structure: root/a/b/deep.txt — depth_limit=1 means we enter 'a' but not 'b'
         deep = tmp_path / "a" / "b"
         deep.mkdir(parents=True)
@@ -358,7 +358,7 @@ class TestScanDir:
         )
         assert node["file_count"] == 1  # only shallow.txt
 
-    def test_unlimited_depth_traverses_all_levels(self, tmp_path: Path):
+    def test_unlimited_depth_traverses_all_levels(self, tmp_path: Path) -> None:
         deep = tmp_path / "a" / "b" / "c"
         deep.mkdir(parents=True)
         (deep / "file.txt").write_bytes(b"deep")
@@ -367,7 +367,7 @@ class TestScanDir:
         )
         assert node["file_count"] == 1
 
-    def test_stops_early_on_max_files(self, tmp_path: Path):
+    def test_stops_early_on_max_files(self, tmp_path: Path) -> None:
         for i in range(10):
             (tmp_path / f"file{i}.txt").write_bytes(b"x")
         state = _State(max_files=4)
@@ -377,7 +377,7 @@ class TestScanDir:
         assert node["file_count"] <= 4
         assert state.stopped
 
-    def test_children_are_sorted_alphabetically(self, tmp_path: Path):
+    def test_children_are_sorted_alphabetically(self, tmp_path: Path) -> None:
         for name in ("zebra", "alpha", "middle"):
             (tmp_path / name).mkdir()
         node = _scan_dir(
@@ -386,7 +386,7 @@ class TestScanDir:
         names = [c["name"] for c in node["children"]]
         assert names == sorted(names)
 
-    def test_skips_symlinks_to_files(self, tmp_path: Path):
+    def test_skips_symlinks_to_files(self, tmp_path: Path) -> None:
         real = tmp_path / "real.txt"
         real.write_bytes(b"content")
         try:
@@ -399,7 +399,7 @@ class TestScanDir:
         )
         assert node["file_count"] == 1  # only the real file
 
-    def test_skips_symlinks_to_directories(self, tmp_path: Path):
+    def test_skips_symlinks_to_directories(self, tmp_path: Path) -> None:
         real_dir = tmp_path / "real_dir"
         real_dir.mkdir()
         (real_dir / "file.txt").write_bytes(b"content")
@@ -418,43 +418,43 @@ class TestScanDir:
 class TestExitCodes:
     """The code a completed scan reports, and the step it points at next."""
 
-    def test_a_whole_scan_succeeds(self, tmp_path: Path, monkeypatch):
+    def test_a_whole_scan_succeeds(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         assert Explore(_args(path=str(scan), name="whole"), _TRIMMED).run().code == EXIT_OK
 
-    def test_stopping_on_max_files_is_partial(self, tmp_path: Path, monkeypatch):
+    def test_stopping_on_max_files_is_partial(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         outcome = Explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED).run()
         assert outcome.code == EXIT_PARTIAL
 
-    def test_stopping_on_timeout_is_partial(self, tmp_path: Path, monkeypatch):
+    def test_stopping_on_timeout_is_partial(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         monkeypatch.setattr(explore_mod.time, "monotonic", _advancing_clock())
         command = Explore(_args(path=str(scan), name="timed", timeout=0.0001), _TRIMMED)
         assert command.run().code == EXIT_PARTIAL
 
-    def test_a_whole_scan_points_at_report(self, tmp_path: Path, monkeypatch):
+    def test_a_whole_scan_points_at_report(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         outcome = Explore(_args(path=str(scan), name="whole"), _TRIMMED).run()
         assert outcome.next_step.command == "report"
 
-    def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch):
+    def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         outcome = Explore(_args(path=str(scan), name="named-run"), _TRIMMED).run()
         assert outcome.next_step.name == "named-run"
 
-    def test_a_capped_scan_still_points_at_report(self, tmp_path: Path, monkeypatch):
+    def test_a_capped_scan_still_points_at_report(self, tmp_path: Path, monkeypatch) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         outcome = Explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED).run()
         assert outcome.next_step is not None
 
-    def test_a_capped_scan_says_the_limit_was_reached(self, tmp_path: Path, monkeypatch, capsys):
+    def test_a_capped_scan_says_the_limit_was_reached(self, tmp_path: Path, monkeypatch, capsys) -> None:
         scan = _make_scan_tree(tmp_path)
         _patch(monkeypatch, tmp_path)
         Explore(_args(path=str(scan), name="capped", max_files=1), _TRIMMED).run()
@@ -464,42 +464,42 @@ class TestExitCodes:
 class TestCancelledScan:
     """A first Ctrl+C, which stops the scan and keeps what it has already found."""
 
-    def _cancelled(self, tmp_path, monkeypatch, config=_TRIMMED):
+    def _cancelled(self, tmp_path, monkeypatch, config=_TRIMMED) -> tuple[ExploreOutcome, Path]:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         command = Explore(_args(path=str(scan), name="stopped"), config)
         monkeypatch.setattr(explore_mod, "_scan_dir", _scan_calling(command.cancel))
         return command.run(), out_dir / "stopped.json"
 
-    def test_it_reports_a_partial_scan(self, tmp_path: Path, monkeypatch):
+    def test_it_reports_a_partial_scan(self, tmp_path: Path, monkeypatch) -> None:
         outcome, _ = self._cancelled(tmp_path, monkeypatch)
         assert outcome.code == EXIT_PARTIAL
 
-    def test_it_writes_the_output(self, tmp_path: Path, monkeypatch):
+    def test_it_writes_the_output(self, tmp_path: Path, monkeypatch) -> None:
         _, json_path = self._cancelled(tmp_path, monkeypatch)
         assert json_path.exists()
 
-    def test_it_flags_the_output_partial(self, tmp_path: Path, monkeypatch, load_json):
+    def test_it_flags_the_output_partial(self, tmp_path: Path, monkeypatch, load_json) -> None:
         _, json_path = self._cancelled(tmp_path, monkeypatch)
         assert load_json(json_path)["meta"]["partial"] is True
 
-    def test_it_still_points_at_report(self, tmp_path: Path, monkeypatch):
+    def test_it_still_points_at_report(self, tmp_path: Path, monkeypatch) -> None:
         outcome, _ = self._cancelled(tmp_path, monkeypatch)
         assert outcome.next_step.command == "report"
 
-    def test_it_says_the_scan_stopped_early(self, tmp_path: Path, monkeypatch, capsys):
+    def test_it_says_the_scan_stopped_early(self, tmp_path: Path, monkeypatch, capsys) -> None:
         self._cancelled(tmp_path, monkeypatch)
         assert "Done (partial -- stopped early)." in capsys.readouterr().out
 
-    def test_it_promises_the_partial_will_be_saved(self, tmp_path: Path, monkeypatch, capsys):
+    def test_it_promises_the_partial_will_be_saved(self, tmp_path: Path, monkeypatch, capsys) -> None:
         self._cancelled(tmp_path, monkeypatch)
         assert "the partial scan will be saved" in capsys.readouterr().out
 
-    def test_it_names_what_a_further_press_would_do(self, tmp_path: Path, monkeypatch, capsys):
+    def test_it_names_what_a_further_press_would_do(self, tmp_path: Path, monkeypatch, capsys) -> None:
         self._cancelled(tmp_path, monkeypatch)
         assert "Press Ctrl+C again to discard it." in capsys.readouterr().out
 
-    def test_the_decorated_notice_carries_a_glyph(self, tmp_path: Path, monkeypatch, capsys):
+    def test_the_decorated_notice_carries_a_glyph(self, tmp_path: Path, monkeypatch, capsys) -> None:
         self._cancelled(tmp_path, monkeypatch, config=_DECORATED)
         assert "! Stopping;" in capsys.readouterr().out
 
@@ -507,7 +507,7 @@ class TestCancelledScan:
 class TestInterruptedCommit:
     """A Ctrl+C arriving once the scan is over, while its result is being written."""
 
-    def _pressed(self, tmp_path, monkeypatch, *responses, config=_TRIMMED):
+    def _pressed(self, tmp_path, monkeypatch, *responses, config=_TRIMMED) -> tuple[Explore, Path]:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         command = Explore(_args(path=str(scan), name="saved"), config)
@@ -516,24 +516,24 @@ class TestInterruptedCommit:
         )
         return command, out_dir / "saved.json"
 
-    def test_a_cancel_lets_the_write_finish(self, tmp_path: Path, monkeypatch, load_json):
+    def test_a_cancel_lets_the_write_finish(self, tmp_path: Path, monkeypatch, load_json) -> None:
         command, json_path = self._pressed(tmp_path, monkeypatch, "cancel")
         command.run()
         assert load_json(json_path)["meta"]["total_files"] == 3
 
-    def test_a_cancel_leaves_the_run_successful(self, tmp_path: Path, monkeypatch):
+    def test_a_cancel_leaves_the_run_successful(self, tmp_path: Path, monkeypatch) -> None:
         command, _ = self._pressed(tmp_path, monkeypatch, "cancel")
         assert command.run().code == EXIT_OK
 
     def test_a_cancel_does_not_mark_the_scan_partial(
         self, tmp_path: Path, monkeypatch, load_json, capsys
-    ):
+    ) -> None:
         command, json_path = self._pressed(tmp_path, monkeypatch, "cancel")
         command.run()
         assert load_json(json_path)["meta"]["partial"] is False
         assert "Done." in capsys.readouterr().out
 
-    def test_a_cancel_says_the_scan_is_being_saved(self, tmp_path: Path, monkeypatch, capsys):
+    def test_a_cancel_says_the_scan_is_being_saved(self, tmp_path: Path, monkeypatch, capsys) -> None:
         command, _ = self._pressed(tmp_path, monkeypatch, "cancel")
         command.run()
         assert "Saving the scan; press Ctrl+C again to discard it." in capsys.readouterr().out
@@ -547,7 +547,7 @@ class TestInterruptedCommit:
 
     def test_an_abandon_discards_the_write(
         self, tmp_path: Path, monkeypatch, escalating_run, press
-    ):
+    ) -> None:
         command, json_path = self._pressed_to_abandon(tmp_path, monkeypatch, press)
         with escalating_run(command):
             with pytest.raises(Abandon):
@@ -556,7 +556,7 @@ class TestInterruptedCommit:
 
     def test_an_abandon_leaves_no_partial_file_behind(
         self, tmp_path: Path, monkeypatch, escalating_run, press
-    ):
+    ) -> None:
         command, json_path = self._pressed_to_abandon(tmp_path, monkeypatch, press)
         with escalating_run(command):
             with pytest.raises(Abandon):
@@ -565,7 +565,7 @@ class TestInterruptedCommit:
 
     def test_an_abandon_after_the_write_removes_the_temp_file(
         self, tmp_path: Path, monkeypatch, escalating_run, press
-    ):
+    ) -> None:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         command = Explore(_args(path=str(scan), name="saved"), _TRIMMED)
@@ -580,7 +580,7 @@ class TestInterruptedCommit:
 class TestAbandonedScan:
     """A second Ctrl+C, which discards the scan outright."""
 
-    def _abandoned(self, tmp_path, monkeypatch, escalating_run, press, config=_TRIMMED):
+    def _abandoned(self, tmp_path, monkeypatch, escalating_run, press, config=_TRIMMED) -> Path:
         scan = _make_scan_tree(tmp_path)
         out_dir = _patch(monkeypatch, tmp_path)
         command = Explore(_args(path=str(scan), name="stopped"), config)
@@ -590,31 +590,31 @@ class TestAbandonedScan:
                 command.run()
         return out_dir / "stopped.json"
 
-    def test_it_writes_nothing(self, tmp_path: Path, monkeypatch, escalating_run, press):
+    def test_it_writes_nothing(self, tmp_path: Path, monkeypatch, escalating_run, press) -> None:
         json_path = self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert not json_path.exists()
 
     def test_it_leaves_no_partial_file_behind(
         self, tmp_path: Path, monkeypatch, escalating_run, press
-    ):
+    ) -> None:
         json_path = self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert list(json_path.parent.glob("*.tmp")) == []
 
     def test_it_says_the_scan_was_discarded(
         self, tmp_path: Path, monkeypatch, escalating_run, press, capsys
-    ):
+    ) -> None:
         self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert "Discarded; no scan was saved." in capsys.readouterr().out
 
     def test_the_trimmed_notice_is_the_bare_message(
         self, tmp_path: Path, monkeypatch, escalating_run, press, capsys
-    ):
+    ) -> None:
         self._abandoned(tmp_path, monkeypatch, escalating_run, press)
         assert capsys.readouterr().out.splitlines()[-1] == "Discarded; no scan was saved."
 
     def test_the_decorated_notice_carries_a_glyph(
         self, tmp_path: Path, monkeypatch, escalating_run, press, capsys
-    ):
+    ) -> None:
         self._abandoned(tmp_path, monkeypatch, escalating_run, press, config=_DECORATED)
         assert capsys.readouterr().out.splitlines()[-1] == "! Discarded; no scan was saved."
 
@@ -672,6 +672,6 @@ class TestInterruptResponse:
         tmp_path,
         monkeypatch,
         assert_interrupt_response,
-    ):
+    ) -> None:
         command = make_command(tmp_path, monkeypatch)
         assert_interrupt_response(command, action, expected, notice)

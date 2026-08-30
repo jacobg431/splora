@@ -28,7 +28,7 @@ def _comments(text: str) -> Iterator[tokenize.TokenInfo]:
             yield token
 
 
-def test_no_comment_switches_off_a_checker(source_files, failure_message):
+def test_no_comment_switches_off_a_checker(source_files, failure_message) -> None:
     offenders = [
         _Suppression(path=path, lineno=token.start[0], name=token.string)
         for path, text in source_files

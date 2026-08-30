@@ -62,34 +62,34 @@ def _pressed(times: int) -> _Responses:
 class TestDispatch:
     """Which response each successive Ctrl+C triggers."""
 
-    def test_the_first_press_cancels(self):
+    def test_the_first_press_cancels(self) -> None:
         assert _pressed(1).cancels == 1
 
-    def test_the_first_press_does_not_abandon(self):
+    def test_the_first_press_does_not_abandon(self) -> None:
         assert _pressed(1).abandons == 0
 
-    def test_the_first_press_does_not_kill(self):
+    def test_the_first_press_does_not_kill(self) -> None:
         assert _pressed(1).exits == []
 
-    def test_the_second_press_abandons(self):
+    def test_the_second_press_abandons(self) -> None:
         assert _pressed(2).abandons == 1
 
-    def test_the_second_press_does_not_cancel_again(self):
+    def test_the_second_press_does_not_cancel_again(self) -> None:
         assert _pressed(2).cancels == 1
 
-    def test_the_second_press_does_not_kill(self):
+    def test_the_second_press_does_not_kill(self) -> None:
         assert _pressed(2).exits == []
 
-    def test_the_third_press_kills(self):
+    def test_the_third_press_kills(self) -> None:
         assert _pressed(3).exits == [_KILL_CODE]
 
-    def test_the_third_press_does_not_abandon_again(self):
+    def test_the_third_press_does_not_abandon_again(self) -> None:
         assert _pressed(3).abandons == 1
 
-    def test_a_fourth_press_kills_again(self):
+    def test_a_fourth_press_kills_again(self) -> None:
         assert _pressed(4).exits == [_KILL_CODE, _KILL_CODE]
 
-    def test_no_press_triggers_no_response(self):
+    def test_no_press_triggers_no_response(self) -> None:
         responses = _pressed(0)
         assert (responses.cancels, responses.abandons, responses.exits) == (0, 0, [])
 
@@ -97,15 +97,15 @@ class TestDispatch:
 class TestKillNotice:
     """What a hard kill writes out before it exits."""
 
-    def test_the_kill_says_so_on_standard_error(self, capfd):
+    def test_the_kill_says_so_on_standard_error(self, capfd) -> None:
         _pressed(3)
         assert "Killed." in capfd.readouterr().err
 
-    def test_the_kill_notice_is_ascii(self, capfd):
+    def test_the_kill_notice_is_ascii(self, capfd) -> None:
         _pressed(3)
         assert capfd.readouterr().err.isascii()
 
-    def test_the_earlier_presses_write_nothing(self, capfd):
+    def test_the_earlier_presses_write_nothing(self, capfd) -> None:
         _pressed(2)
         assert capfd.readouterr().err == ""
 
@@ -113,7 +113,7 @@ class TestKillNotice:
 class TestHandlerRestoration:
     """The SIGINT handler in place before, during, and after the block."""
 
-    def test_a_handler_is_installed_for_the_block(self):
+    def test_a_handler_is_installed_for_the_block(self) -> None:
         before = signal.getsignal(signal.SIGINT)
         responses = _Responses()
         with escalating(
@@ -124,12 +124,12 @@ class TestHandlerRestoration:
         ):
             assert signal.getsignal(signal.SIGINT) is not before
 
-    def test_the_previous_handler_is_restored(self):
+    def test_the_previous_handler_is_restored(self) -> None:
         before = signal.getsignal(signal.SIGINT)
         _pressed(1)
         assert signal.getsignal(signal.SIGINT) is before
 
-    def test_the_previous_handler_is_restored_after_a_failure(self):
+    def test_the_previous_handler_is_restored_after_a_failure(self) -> None:
         before = signal.getsignal(signal.SIGINT)
         responses = _Responses()
         with pytest.raises(RuntimeError):
@@ -146,30 +146,30 @@ class TestHandlerRestoration:
 class TestExceptionFamily:
     """How the interrupt exceptions relate to one another."""
 
-    def test_an_interrupt_is_a_keyboard_interrupt(self):
+    def test_an_interrupt_is_a_keyboard_interrupt(self) -> None:
         assert issubclass(Interrupt, KeyboardInterrupt)
 
-    def test_a_cancel_is_an_interrupt(self):
+    def test_a_cancel_is_an_interrupt(self) -> None:
         assert issubclass(Cancel, Interrupt)
 
-    def test_an_abandon_is_an_interrupt(self):
+    def test_an_abandon_is_an_interrupt(self) -> None:
         assert issubclass(Abandon, Interrupt)
 
-    def test_an_abandon_is_not_a_cancel(self):
+    def test_an_abandon_is_not_a_cancel(self) -> None:
         assert not issubclass(Abandon, Cancel)
 
-    def test_a_cancel_is_not_an_abandon(self):
+    def test_a_cancel_is_not_an_abandon(self) -> None:
         assert not issubclass(Cancel, Abandon)
 
-    def test_catching_the_family_catches_a_cancel(self):
+    def test_catching_the_family_catches_a_cancel(self) -> None:
         with pytest.raises(Interrupt):
             raise Cancel
 
-    def test_catching_the_family_catches_an_abandon(self):
+    def test_catching_the_family_catches_an_abandon(self) -> None:
         with pytest.raises(Interrupt):
             raise Abandon
 
-    def test_a_broad_exception_handler_does_not_catch_the_family(self):
+    def test_a_broad_exception_handler_does_not_catch_the_family(self) -> None:
         with pytest.raises(Abandon):
             try:
                 raise Abandon
@@ -180,7 +180,7 @@ class TestExceptionFamily:
 class TestResponseDispatch:
     """Whether a press unwinds the run, decided by what cancel/abandon answer."""
 
-    def test_cancel_answering_unwind_raises_cancel(self):
+    def test_cancel_answering_unwind_raises_cancel(self) -> None:
         responses = _Responses(cancel_response=Response.UNWIND)
         with pytest.raises(Cancel):
             with escalating(
@@ -191,7 +191,7 @@ class TestResponseDispatch:
             ):
                 _press(1)
 
-    def test_cancel_answering_handled_does_not_raise(self):
+    def test_cancel_answering_handled_does_not_raise(self) -> None:
         responses = _Responses(cancel_response=Response.HANDLED)
         with escalating(
             cancel=responses.cancel,
@@ -202,7 +202,7 @@ class TestResponseDispatch:
             _press(1)
         assert responses.cancels == 1
 
-    def test_abandon_answering_unwind_raises_abandon(self):
+    def test_abandon_answering_unwind_raises_abandon(self) -> None:
         responses = _Responses(abandon_response=Response.UNWIND)
         with pytest.raises(Abandon):
             with escalating(
@@ -213,7 +213,7 @@ class TestResponseDispatch:
             ):
                 _press(2)
 
-    def test_abandon_answering_handled_does_not_raise(self):
+    def test_abandon_answering_handled_does_not_raise(self) -> None:
         responses = _Responses(abandon_response=Response.HANDLED)
         with escalating(
             cancel=responses.cancel,
@@ -224,7 +224,7 @@ class TestResponseDispatch:
             _press(2)
         assert responses.abandons == 1
 
-    def test_a_handled_first_press_still_lets_a_second_press_unwind(self):
+    def test_a_handled_first_press_still_lets_a_second_press_unwind(self) -> None:
         # Regression case: a double answering UNWIND for both presses makes the first raise
         # before the second is ever reached, hiding the abandon path entirely.
         responses = _Responses(cancel_response=Response.HANDLED, abandon_response=Response.UNWIND)

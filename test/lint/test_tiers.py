@@ -78,7 +78,7 @@ def _tier(path: Path) -> str | None:
     return parts[1]
 
 
-def test_unit_tests_do_not_request_filesystem_fixtures(parsed_files, failure_message):
+def test_unit_tests_do_not_request_filesystem_fixtures(parsed_files, failure_message) -> None:
     offenders: list[_Violation] = []
     for path, tree in parsed_files:
         if path.parts[:2] != _UNIT_TIER:
@@ -94,7 +94,7 @@ def test_unit_tests_do_not_request_filesystem_fixtures(parsed_files, failure_mes
     )
 
 
-def test_restricted_modules_are_imported_only_by_their_tier(parsed_files, failure_message):
+def test_restricted_modules_are_imported_only_by_their_tier(parsed_files, failure_message) -> None:
     offenders: list[_Violation] = []
     for path, tree in parsed_files:
         tier = _tier(path)

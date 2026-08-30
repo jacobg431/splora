@@ -138,28 +138,28 @@ def imports(
     return tuple(found)
 
 
-def test_imports_are_declared_at_module_level(imports, failure_message):
+def test_imports_are_declared_at_module_level(imports, failure_message) -> None:
     offenders = [record for record in imports if record.is_nested]
     assert not offenders, failure_message("an import is declared inside a function", offenders)
 
 
-def test_every_module_declares_a_layer(production_modules):
+def test_every_module_declares_a_layer(production_modules) -> None:
     undeclared = sorted(production_modules - set(_declared()))
     assert not undeclared, f"modules absent from the layer map: {', '.join(undeclared)}"
 
 
-def test_the_layer_map_names_only_existing_modules(production_modules):
+def test_the_layer_map_names_only_existing_modules(production_modules) -> None:
     stale = sorted(set(_declared()) - production_modules)
     assert not stale, f"layer map names modules that do not exist: {', '.join(stale)}"
 
 
-def test_no_module_is_declared_in_two_layers(production_modules):
+def test_no_module_is_declared_in_two_layers(production_modules) -> None:
     declared = _declared()
     repeated = sorted({module for module in declared if declared.count(module) > 1})
     assert not repeated, f"modules declared in more than one layer: {', '.join(repeated)}"
 
 
-def test_modules_import_only_from_lower_layers(imports, failure_message):
+def test_modules_import_only_from_lower_layers(imports, failure_message) -> None:
     offenders: list[_Violation] = []
     for record in imports:
         source = _layer_index(record.module)
