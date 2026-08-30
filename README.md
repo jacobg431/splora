@@ -70,12 +70,13 @@ Each command reports what happened through its exit code, so a script can tell a
 | Usage error, such as an unrecognised flag | `2` |
 | `explore` stopped early by `--max-files`, `--timeout`, or one Ctrl+C | `3` |
 | `explore` aborted by a second Ctrl+C, or `report` canceled part-built | `130` |
+| Any command hard-killed by a third Ctrl+C | `137` |
 
 ### Explore
 
 The `explore` command will traverse through the file system located under the given path and continuously write information about the filesystem into a JSON file. All JSON files are located in the [`data/filesystem`](data/filesystem) folder.
 
-While the scan runs, a live counter of files, elapsed time, size and throughput is redrawn in place. Pressing Ctrl+C once stops the scan and still writes what was gathered, flagged as a partial run. Pressing it a second time abandons the run and writes nothing.
+While the scan runs, a live counter of files, elapsed time, size and throughput is redrawn in place (only when the terminal is interactive). Pressing Ctrl+C once stops the scan and still writes what was gathered, flagged as a partial run. Pressing it a second time abandons the run and writes nothing. A third press forces an immediate exit.
 
 This command can be run with the following options:
 - `--name <run-name>` The title of the exploration run. Used as the filename for the JSON file and as the title in the HTML report. Defaults to the provided root folder name.
@@ -114,6 +115,31 @@ The `boot` command will open the generated report in the browser.
 
 This command can be run with the following options:
 - `--name <run-name>` The report folder name under [`data/report`](data/report) to open. Defaults to the last generated report.
+
+## Architecture
+
+The three commands above are the whole pipeline: `explore` writes a JSON scan, `report` turns it into a static site, `boot` serves that site.
+
+Production code sits in layers, and a module may import only from a strictly lower one. The map is enforced by [`test/lint/test_imports.py`](test/lint/test_imports.py), which also fails on any module missing from it.
+
+| Layer | Modules |
+|---|---|
+| entry point | `splora.py` |
+| commands | `src/explore.py`, `src/report.py`, `src/boot.py` |
+| runtime | `src/frame.py` |
+| components | `src/banner.py`, `src/command.py`, `src/progress.py` |
+| primitives | `src/escalation.py`, `src/outcome.py`, `src/terminal.py` |
+
+The report front end is copied from [`data/template`](data/template).
+
+| Path | Holds |
+|---|---|
+| `index.html`, `style.css` | Page shell and styling |
+| `main.js` | Entry module; wires the widgets to the data |
+| `data.js` | Loads `data.json` and builds the node lookup |
+| `core/` | Widget base class, theme tokens, SVG helpers, layout math |
+| `widgets/` | The treemap and donut visualizations |
+| `ui/` | Sidebar and folder tree |
 
 ## Development
 

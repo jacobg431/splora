@@ -41,16 +41,17 @@ into an invisible one.
 |---|---|
 | [`conventions.md`](conventions.md) | This file. The rules of the repository. |
 | [`log.md`](log.md) | Append-only activity log. One line per entry. |
-| [`notes.md`](notes.md) | Design decisions, architecture, and implementation status. |
+| [`notes.md`](notes.md) | Binding design decisions, lessons already paid for, and known-but-unfixed defects. |
 | [`skills/`](skills/) | Instructions for recurring workflows. |
 | [`temp/`](temp/) | Git-ignored scratch space. Safe to write freely. |
 
 - **`log.md`** — one line per source-code change, as
   `[YYYY-MM-DD] <intent> | <action taken> | <outcome>`. Facts only, no commentary. Append-only
   and never revised. Failed attempts are logged; documentation-only work is not.
-- **`notes.md`** — what is true *now*, not what happened. Read it at the start of a session to
-  restore context, and replace superseded content rather than appending to it. Session-scoped
-  rationale belongs in `temp/` instead.
+- **`notes.md`** — what an agent would otherwise relearn the hard way. Not a substitute for
+  `README.md` (how the code is laid out) or `SPLORA_PLAN.md` (what is planned). State what is
+  true *now*; replace superseded content rather than appending to it. Session-scoped rationale
+  belongs in `temp/` instead.
 - **`skills/`** — one task-named folder per workflow, each holding a `SKILL.md` whose YAML
   frontmatter (`name`, one-line `description`) precedes instructions for carrying out that task
   here. New skills follow the same layout.
