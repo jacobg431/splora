@@ -23,10 +23,10 @@ def declared_version() -> str:
 class TestInstalledVersion:
     """The version the banner reports, read from the installed package metadata."""
 
-    def test_reports_the_version_the_project_declares(self, declared_version) -> None:
+    def test_reports_the_version_the_project_declares(self, declared_version: str) -> None:
         assert installed_version() == declared_version
 
-    def test_the_fallback_matches_the_declared_version(self, declared_version) -> None:
+    def test_the_fallback_matches_the_declared_version(self, declared_version: str) -> None:
         assert banner_mod._VERSION_WHEN_NOT_INSTALLED == declared_version
 
     def test_the_reported_version_is_ascii(self) -> None:

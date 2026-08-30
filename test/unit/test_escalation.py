@@ -97,15 +97,15 @@ class TestDispatch:
 class TestKillNotice:
     """What a hard kill writes out before it exits."""
 
-    def test_the_kill_says_so_on_standard_error(self, capfd) -> None:
+    def test_the_kill_says_so_on_standard_error(self, capfd: pytest.CaptureFixture[str]) -> None:
         _pressed(3)
         assert "Killed." in capfd.readouterr().err
 
-    def test_the_kill_notice_is_ascii(self, capfd) -> None:
+    def test_the_kill_notice_is_ascii(self, capfd: pytest.CaptureFixture[str]) -> None:
         _pressed(3)
         assert capfd.readouterr().err.isascii()
 
-    def test_the_earlier_presses_write_nothing(self, capfd) -> None:
+    def test_the_earlier_presses_write_nothing(self, capfd: pytest.CaptureFixture[str]) -> None:
         _pressed(2)
         assert capfd.readouterr().err == ""
 

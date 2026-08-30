@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,7 +36,9 @@ def _except_handlers(tree: ast.Module) -> list[ast.ExceptHandler]:
     return [node for node in ast.walk(tree) if isinstance(node, ast.ExceptHandler)]
 
 
-def test_no_broad_interrupt_catch_outside_escalation(parsed_files, failure_message) -> None:
+def test_no_broad_interrupt_catch_outside_escalation(
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: Callable[..., str]
+) -> None:
     offenders = [
         _Violation(path=path, lineno=handler.lineno, name=f"except {ast.unparse(handler.type)}")
         for path, tree in parsed_files

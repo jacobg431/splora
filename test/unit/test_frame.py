@@ -20,13 +20,13 @@ _STEP = NextStep(command="report", name="my-run")
 
 
 @pytest.fixture(autouse=True)
-def fixed_version(monkeypatch) -> None:
+def fixed_version(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin the version so the frame's output never depends on how the package was installed."""
     monkeypatch.setattr(frame_mod, "installed_version", lambda: "1.2.3")
 
 
 @pytest.fixture(autouse=True)
-def untouched_console(monkeypatch) -> None:
+def untouched_console(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the frame from reconfiguring the console the test run is using."""
     monkeypatch.setattr(frame_mod, "enable_virtual_terminal", lambda: None)
 
@@ -155,15 +155,15 @@ class TestExitCode:
 class TestBannerGating:
     """Whether the banner is printed, decided solely by the frame."""
 
-    def test_prints_the_banner_by_default(self, capsys) -> None:
+    def test_prints_the_banner_by_default(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK)), _decorated())
         assert TAGLINE in capsys.readouterr().out
 
-    def test_trimming_suppresses_the_banner(self, capsys) -> None:
+    def test_trimming_suppresses_the_banner(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK)), _trimmed())
         assert TAGLINE not in capsys.readouterr().out
 
-    def test_the_banner_precedes_the_command(self, capsys) -> None:
+    def test_the_banner_precedes_the_command(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK), _COMMAND_OUTPUT), _decorated())
         out = capsys.readouterr().out
         assert out.index(TAGLINE) < out.index(_COMMAND_OUTPUT)
@@ -172,24 +172,24 @@ class TestBannerGating:
 class TestAdviceGating:
     """Whether the next-step advice is printed."""
 
-    def test_prints_the_advice_for_a_next_step(self, capsys) -> None:
+    def test_prints_the_advice_for_a_next_step(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK, next_step=_STEP)), _decorated())
         assert "splora report --name my-run" in capsys.readouterr().out
 
-    def test_trimming_suppresses_the_advice(self, capsys) -> None:
+    def test_trimming_suppresses_the_advice(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK, next_step=_STEP)), _trimmed())
         assert "splora report" not in capsys.readouterr().out
 
-    def test_no_advice_without_a_next_step(self, capsys) -> None:
+    def test_no_advice_without_a_next_step(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_INTERRUPTED)), _decorated())
         assert "Next:" not in capsys.readouterr().out
 
-    def test_the_advice_follows_the_command(self, capsys) -> None:
+    def test_the_advice_follows_the_command(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK, next_step=_STEP), _COMMAND_OUTPUT), _decorated())
         out = capsys.readouterr().out
         assert out.index(_COMMAND_OUTPUT) < out.index("Next:")
 
-    def test_a_partial_run_still_advises(self, capsys) -> None:
+    def test_a_partial_run_still_advises(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_PARTIAL, next_step=_STEP)), _decorated())
         assert "Next:" in capsys.readouterr().out
 
@@ -202,15 +202,15 @@ class TestRunningTheCommand:
         run(command, _decorated())
         assert command.runs == 1
 
-    def test_lets_the_commands_output_through(self, capsys) -> None:
+    def test_lets_the_commands_output_through(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK), _COMMAND_OUTPUT), _decorated())
         assert _COMMAND_OUTPUT in capsys.readouterr().out
 
-    def test_trimming_keeps_the_commands_output(self, capsys) -> None:
+    def test_trimming_keeps_the_commands_output(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK), _COMMAND_OUTPUT), _trimmed())
         assert _COMMAND_OUTPUT in capsys.readouterr().out
 
-    def test_trimmed_output_is_the_command_alone(self, capsys) -> None:
+    def test_trimmed_output_is_the_command_alone(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Stub(Outcome(code=EXIT_OK, next_step=_STEP), _COMMAND_OUTPUT), _trimmed())
         assert capsys.readouterr().out == f"{_COMMAND_OUTPUT}\n"
 
@@ -218,7 +218,9 @@ class TestRunningTheCommand:
         with pytest.raises(SystemExit):
             run(_Raising(SystemExit(1)), _decorated())
 
-    def test_a_command_that_exits_hard_gets_no_advice(self, capsys) -> None:
+    def test_a_command_that_exits_hard_gets_no_advice(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         with pytest.raises(SystemExit):
             run(_Raising(SystemExit(1)), _decorated())
         assert "Next:" not in capsys.readouterr().out
@@ -233,11 +235,13 @@ class TestInterrupt:
     def test_an_abandon_becomes_the_interrupted_code(self) -> None:
         assert run(_Raising(Abandon()), _decorated()) == EXIT_INTERRUPTED
 
-    def test_the_frame_adds_no_notice_of_its_own(self, capsys) -> None:
+    def test_the_frame_adds_no_notice_of_its_own(self, capsys: pytest.CaptureFixture[str]) -> None:
         run(_Raising(Abandon()), _trimmed())
         assert capsys.readouterr().out == ""
 
-    def test_an_interrupted_command_gets_no_advice(self, capsys) -> None:
+    def test_an_interrupted_command_gets_no_advice(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         run(_Raising(Cancel()), _decorated())
         assert "Next:" not in capsys.readouterr().out
 

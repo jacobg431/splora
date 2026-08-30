@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,7 +13,7 @@ from src.boot import _POLL_INTERVAL, _find_free_port, _sanitize, _serve
 _SERVED_DIR = Path("/reports/my-run")
 
 
-def _stop_after(n: int):
+def _stop_after(n: int) -> Callable[[], bool]:
     """Return a should_stop callable that answers False n times, then True forever."""
     calls = 0
 
@@ -49,7 +50,7 @@ class TestSanitize:
 class TestFindFreePort:
     """Selection of the first available port within the scan range."""
 
-    def _mock_socket(self, bind_side_effect=None) -> MagicMock:
+    def _mock_socket(self, bind_side_effect: object = None) -> MagicMock:
         """Return a mock socket context manager."""
         s = MagicMock()
         s.__enter__.return_value = s

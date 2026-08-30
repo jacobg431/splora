@@ -33,26 +33,28 @@ def testpaths(pyproject: dict[str, Any]) -> list[str]:
     return pyproject["tool"]["pytest"]["ini_options"]["testpaths"]
 
 
-def test_the_project_declares_no_runtime_dependencies(pyproject) -> None:
+def test_the_project_declares_no_runtime_dependencies(pyproject: dict[str, Any]) -> None:
     declared = pyproject["project"]["dependencies"]
     assert declared == [], f"runtime dependencies declared: {', '.join(declared)}"
 
 
-def test_runtime_dependencies_are_not_declared_dynamically(pyproject) -> None:
+def test_runtime_dependencies_are_not_declared_dynamically(pyproject: dict[str, Any]) -> None:
     dynamic = pyproject["project"].get("dynamic", [])
     assert "dependencies" not in dynamic, "dependencies are dynamic, so their absence is unchecked"
 
 
-def test_every_test_tier_runs_by_default_except_the_deferred_one(repo_root, testpaths) -> None:
+def test_every_test_tier_runs_by_default_except_the_deferred_one(
+    repo_root: Path, testpaths: list[str]
+) -> None:
     absent = sorted(_tiers(repo_root) - set(testpaths) - {_DEFERRED_TIER})
     assert not absent, f"test tiers that never run in the default suite: {', '.join(absent)}"
 
 
-def test_the_deferred_test_tier_is_invoked_explicitly(testpaths) -> None:
+def test_the_deferred_test_tier_is_invoked_explicitly(testpaths: list[str]) -> None:
     assert _DEFERRED_TIER not in testpaths, f"{_DEFERRED_TIER} runs in the default suite"
 
 
-def test_the_python_version_is_declared_consistently(pyproject) -> None:
+def test_the_python_version_is_declared_consistently(pyproject: dict[str, Any]) -> None:
     requires = pyproject["project"]["requires-python"]
     minimum = _MINIMUM_VERSION.search(requires)
     assert minimum, f"requires-python names no minimum version: {requires}"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -78,7 +78,9 @@ def _tier(path: Path) -> str | None:
     return parts[1]
 
 
-def test_unit_tests_do_not_request_filesystem_fixtures(parsed_files, failure_message) -> None:
+def test_unit_tests_do_not_request_filesystem_fixtures(
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: Callable[..., str]
+) -> None:
     offenders: list[_Violation] = []
     for path, tree in parsed_files:
         if path.parts[:2] != _UNIT_TIER:
@@ -94,7 +96,9 @@ def test_unit_tests_do_not_request_filesystem_fixtures(parsed_files, failure_mes
     )
 
 
-def test_restricted_modules_are_imported_only_by_their_tier(parsed_files, failure_message) -> None:
+def test_restricted_modules_are_imported_only_by_their_tier(
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: Callable[..., str]
+) -> None:
     offenders: list[_Violation] = []
     for path, tree in parsed_files:
         tier = _tier(path)

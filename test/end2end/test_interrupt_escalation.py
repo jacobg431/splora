@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import time
+from collections.abc import Callable
 
 import pytest
 
@@ -28,7 +30,13 @@ class TestInterruptEscalation:
 
     @pytest.mark.parametrize("cancel, abandon, presses, expected_code", _CASES)
     def test_escalation(
-        self, mock_command_process, press, cancel, abandon, presses, expected_code
+        self,
+        mock_command_process: Callable[..., subprocess.Popen[str]],
+        press: Callable[[subprocess.Popen[str]], None],
+        cancel: str,
+        abandon: str,
+        presses: int,
+        expected_code: int | None,
     ) -> None:
         proc = mock_command_process(cancel=cancel, abandon=abandon)
 

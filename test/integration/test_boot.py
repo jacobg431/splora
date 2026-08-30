@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import ANY, patch
 
 import pytest
@@ -22,7 +25,7 @@ def _set_mtime(path: Path, when: float) -> None:
     os.utime(path, (when, when))
 
 
-def _patch(monkeypatch, tmp_path: Path) -> Path:
+def _patch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """Create a reports root directory and redirect _REPORT_DIR to it."""
     report_dir = tmp_path / "reports"
     report_dir.mkdir()
@@ -34,7 +37,10 @@ class TestBootCommand:
     """The boot command resolving a report and starting the server."""
 
     def test_calls_serve_with_correct_directory_and_port(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
@@ -46,7 +52,10 @@ class TestBootCommand:
         mock_serve.assert_called_once_with(report_dir / "my-run", 9001, should_stop=ANY)
 
     def test_resolves_latest_report_when_no_name_given(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "first").mkdir()
@@ -60,7 +69,10 @@ class TestBootCommand:
         mock_serve.assert_called_once_with(report_dir / "second", 9001, should_stop=ANY)
 
     def test_name_sanitization_resolves_correct_directory(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "C_drive").mkdir()
@@ -71,7 +83,12 @@ class TestBootCommand:
 
         mock_serve.assert_called_once_with(report_dir / "C_drive", 9001, should_stop=ANY)
 
-    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_unknown_name_exits_with_code_1(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
@@ -79,7 +96,10 @@ class TestBootCommand:
         assert exc.value.code == 1
 
     def test_empty_report_dir_exits_with_code_1(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         _patch(monkeypatch, tmp_path)
 
@@ -88,18 +108,21 @@ class TestBootCommand:
         assert exc.value.code == 1
 
     def test_port_is_found_before_serve_is_called(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
 
         call_order = []
 
-        def fake_find_port():
+        def fake_find_port() -> int:
             call_order.append("find_port")
             return 9001
 
-        def fake_serve(d, p, **_):
+        def fake_serve(d: object, p: object, **_: Any) -> None:
             call_order.append("serve")
 
         with patch.object(boot_mod, "_find_free_port", side_effect=fake_find_port):
@@ -112,12 +135,20 @@ class TestBootCommand:
 class TestStopping:
     """How the command ends once the user interrupts the server it started."""
 
-    def _served(self, tmp_path: Path, monkeypatch, name_args, action: str) -> Outcome:
+    def _served(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        action: str,
+    ) -> Outcome:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
         command = Boot(name_args("my-run"), _TRIMMED)
 
-        def fake_serve(_report_dir, _port, *, should_stop, **_kwargs) -> None:
+        def fake_serve(
+            _report_dir: object, _port: object, *, should_stop: Callable[[], bool], **_kwargs: Any
+        ) -> None:
             getattr(command, action)()
             assert should_stop()
 
@@ -125,19 +156,32 @@ class TestStopping:
             with patch.object(boot_mod, "_serve", side_effect=fake_serve):
                 return command.run()
 
-    def test_a_cancel_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_a_cancel_ends_the_run_cleanly(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").code == EXIT_OK
 
-    def test_a_cancel_offers_no_next_step(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_a_cancel_offers_no_next_step(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").next_step is None
 
     def test_an_abandon_also_ends_the_run_cleanly(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "abandon").code == EXIT_OK
 
 
-def _boot_serving(name_args) -> Boot:
+def _boot_serving(name_args: Callable[..., argparse.Namespace]) -> Boot:
     return Boot(name_args("my-run"), _TRIMMED)
 
 
@@ -152,7 +196,13 @@ class TestInterruptResponse:
 
     @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
     def test_interrupt_response(
-        self, make_command, action, expected, notice, name_args, assert_interrupt_response
+        self,
+        make_command: Callable[..., Boot],
+        action: str,
+        expected: Response,
+        notice: str | None,
+        name_args: Callable[..., argparse.Namespace],
+        assert_interrupt_response: Callable[..., None],
     ) -> None:
         command = make_command(name_args)
         assert_interrupt_response(command, action, expected, notice)
@@ -261,7 +311,7 @@ class TestStagingDirectoriesAreIgnored:
         assert _latest_report(tmp_path) is None
 
     def test_resolving_without_a_name_skips_a_newer_staging_directory(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         finished = report_dir / "run-a"
@@ -273,7 +323,7 @@ class TestStagingDirectoriesAreIgnored:
         assert _resolve_report_dir(None, report_dir) == finished
 
     def test_a_staging_directory_alone_leaves_nothing_to_serve(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / ".run-a.tmp").mkdir()

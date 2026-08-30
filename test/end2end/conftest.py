@@ -18,6 +18,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -184,7 +185,11 @@ def scratch_run() -> Callable[[str], str]:
 
 
 @pytest.fixture(scope="session")
-def e2e_pipeline(tmp_path_factory, run_cli, serve_dir) -> dict[str, str | Path | int]:
+def e2e_pipeline(
+    tmp_path_factory: pytest.TempPathFactory,
+    run_cli: Callable[..., None],
+    serve_dir: Callable[..., Any],
+) -> dict[str, str | Path | int]:
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)

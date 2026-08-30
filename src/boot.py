@@ -28,7 +28,7 @@ _POLL_INTERVAL = 0.5
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     """SimpleHTTPRequestHandler with per-request logging suppressed."""
 
-    def log_message(self, *_) -> None:
+    def log_message(self, *_: object) -> None:
         """Discard the per-request log line the base handler would emit."""
 
 

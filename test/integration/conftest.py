@@ -65,7 +65,9 @@ def press() -> Callable[[int], None]:
 
 
 @pytest.fixture
-def assert_interrupt_response(capsys) -> Callable[[Command, str, Response, str | None], None]:
+def assert_interrupt_response(
+    capsys: pytest.CaptureFixture[str],
+) -> Callable[[Command, str, Response, str | None], None]:
     """Return a helper that calls a command's cancel()/abandon() and checks the response."""
 
     def assert_response(

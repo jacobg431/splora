@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 import src.report as report_mod
+from src.command import Command
 from src.escalation import Cancel, Response
 from src.outcome import EXIT_OK, Outcome
 from src.report import (
@@ -36,7 +40,7 @@ _REAL_RMTREE = shutil.rmtree
 def _cancelling(press: Callable[[int], None]) -> Callable[..., None]:
     """Return a copytree stand-in that stages the tree in full and then presses once."""
 
-    def stage(src, dst, *_args, **_kwargs):
+    def stage(src: str | Path, dst: str | Path, *_args: Any, **_kwargs: Any) -> None:
         _REAL_COPYTREE(src, dst)
         press(1)
 
@@ -46,7 +50,7 @@ def _cancelling(press: Callable[[int], None]) -> Callable[..., None]:
 def _cancelling_removal_of(target: Path, command: Report) -> Callable[..., None]:
     """Return an rmtree stand-in that cancels the command as the target is being removed."""
 
-    def remove(path, *args, **kwargs):
+    def remove(path: str | Path, *args: Any, **kwargs: Any) -> None:
         if Path(path) == target:
             command.cancel()
         return _REAL_RMTREE(path, *args, **kwargs)
@@ -57,7 +61,7 @@ def _cancelling_removal_of(target: Path, command: Report) -> Callable[..., None]
 def _raising(error: BaseException) -> Callable[..., None]:
     """Return a copytree stand-in that fails before anything is staged."""
 
-    def fail(*_args, **_kwargs):
+    def fail(*_args: Any, **_kwargs: Any) -> None:
         raise error
 
     return fail
@@ -66,7 +70,7 @@ def _raising(error: BaseException) -> Callable[..., None]:
 def _staged_then_raising(error: BaseException) -> Callable[..., None]:
     """Return a copytree stand-in that stages the tree in full and then fails."""
 
-    def fail(src, dst, *_args, **_kwargs):
+    def fail(src: str | Path, dst: str | Path, *_args: Any, **_kwargs: Any) -> None:
         _REAL_COPYTREE(src, dst)
         raise error
 
@@ -117,7 +121,7 @@ def _make_nested_template_dir(parent: Path) -> Path:
     return template_dir
 
 
-def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path]:
+def _patch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[Path, Path, Path]:
     """Create the directories and monkeypatch the module constants."""
     fs_dir = tmp_path / "filesystem"
     report_dir = tmp_path / "report"
@@ -135,7 +139,12 @@ def _patch(monkeypatch, tmp_path: Path) -> tuple[Path, Path, Path]:
 class TestReportCommand:
     """The report command turning a recorded run into a report folder."""
 
-    def test_generates_complete_report_folder(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_generates_complete_report_folder(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
 
@@ -147,7 +156,12 @@ class TestReportCommand:
         assert (out / "main.js").exists()
         assert (out / "data.json").exists()
 
-    def test_data_json_content_matches_source(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_data_json_content_matches_source(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         src_path = _make_fs_json(fs_dir, "my-run")
 
@@ -157,7 +171,10 @@ class TestReportCommand:
         assert written == src_path.read_text(encoding="utf-8")
 
     def test_falls_back_to_latest_json_when_no_name_given(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "first")
@@ -169,7 +186,12 @@ class TestReportCommand:
         assert (report_dir / "second").exists()
         assert not (report_dir / "first").exists()
 
-    def test_unknown_name_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_unknown_name_exits_with_code_1(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
@@ -177,7 +199,10 @@ class TestReportCommand:
         assert exc.value.code == 1
 
     def test_empty_filesystem_dir_exits_with_code_1(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         _patch(monkeypatch, tmp_path)
 
@@ -186,7 +211,10 @@ class TestReportCommand:
         assert exc.value.code == 1
 
     def test_missing_template_file_exits_with_code_1(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, _, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -197,7 +225,11 @@ class TestReportCommand:
         assert exc.value.code == 1
 
     def test_re_running_updates_existing_report(
-        self, tmp_path: Path, monkeypatch, name_args, load_json
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        load_json: Callable[[Path], dict[str, Any]],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -216,7 +248,10 @@ class TestReportCommand:
         assert data["meta"]["total_files"] == 99
 
     def test_partial_scan_does_not_prevent_report_generation(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "partial-run", partial=True)
@@ -226,7 +261,10 @@ class TestReportCommand:
         assert (report_dir / "partial-run" / "data.json").exists()
 
     def test_name_sanitization_finds_correct_file(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "C_drive")  # stored with sanitized name
@@ -236,7 +274,10 @@ class TestReportCommand:
         assert (report_dir / "C_drive").exists()
 
     def test_report_output_contains_no_extra_files(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "clean-run")
@@ -247,7 +288,10 @@ class TestReportCommand:
         assert top == {"index.html", "style.css", "main.js", "data.json"}
 
     def test_stale_asset_removed_after_template_change(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, report_dir, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -427,7 +471,9 @@ class TestBuildReport:
 
         assert out_dir.is_dir()
 
-    def test_idempotent_on_second_call(self, tmp_path: Path, load_json) -> None:
+    def test_idempotent_on_second_call(
+        self, tmp_path: Path, load_json: Callable[[Path], dict[str, Any]]
+    ) -> None:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report"
 
@@ -485,7 +531,7 @@ class TestStaging:
         assert not _staging_dir(out_dir).exists()
 
     def test_nothing_is_staged_when_the_build_fails_before_copying(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
@@ -498,7 +544,7 @@ class TestStaging:
         assert not _staging_dir(out_dir).exists()
 
     def test_a_staged_tree_is_removed_when_the_build_fails_after_copying(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
@@ -513,7 +559,7 @@ class TestStaging:
         assert not _staging_dir(out_dir).exists()
 
     def test_a_failure_after_copying_leaves_the_report_root_clean(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
@@ -528,7 +574,7 @@ class TestStaging:
         assert list(out_dir.parent.iterdir()) == []
 
     def test_the_previous_report_survives_a_failed_rebuild(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         template_dir = _make_nested_template_dir(tmp_path)
         out_dir = tmp_path / "report" / "my-run"
@@ -557,7 +603,13 @@ class TestCancel:
     """A Ctrl+C arriving while the report is being assembled."""
 
     def _cancelled(
-        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, config=_TRIMMED
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        escalating_run: Callable[[Command], AbstractContextManager[None]],
+        press: Callable[[int], None],
+        config: OutputConfig = _TRIMMED,
     ) -> Path:
         fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -569,31 +621,59 @@ class TestCancel:
         return report_dir
 
     def test_leaves_no_staging_directory(
-        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        escalating_run: Callable[[Command], AbstractContextManager[None]],
+        press: Callable[[int], None],
     ) -> None:
         report_dir = self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert not _staging_dir(report_dir / "my-run").exists()
 
     def test_writes_no_report(
-        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        escalating_run: Callable[[Command], AbstractContextManager[None]],
+        press: Callable[[int], None],
     ) -> None:
         report_dir = self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert not (report_dir / "my-run").exists()
 
     def test_says_it_was_canceled(
-        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        escalating_run: Callable[[Command], AbstractContextManager[None]],
+        press: Callable[[int], None],
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert "Canceled." in capsys.readouterr().out
 
     def test_the_trimmed_notice_is_the_bare_message(
-        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        escalating_run: Callable[[Command], AbstractContextManager[None]],
+        press: Callable[[int], None],
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press)
         assert capsys.readouterr().out.splitlines()[-1] == "Canceled."
 
     def test_the_decorated_notice_carries_a_glyph(
-        self, tmp_path: Path, monkeypatch, name_args, escalating_run, press, capsys
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        escalating_run: Callable[[Command], AbstractContextManager[None]],
+        press: Callable[[int], None],
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         self._cancelled(tmp_path, monkeypatch, name_args, escalating_run, press, config=_DECORATED)
         assert capsys.readouterr().out.splitlines()[-1] == "! Canceled."
@@ -602,7 +682,12 @@ class TestCancel:
 class TestInterruptedSwap:
     """An interrupt arriving in the moment a finished report replaces its predecessor."""
 
-    def _rebuilt(self, tmp_path: Path, monkeypatch, name_args) -> tuple[Outcome, Path]:
+    def _rebuilt(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> tuple[Outcome, Path]:
         fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         Report(name_args("my-run"), _TRIMMED).run()
@@ -612,21 +697,40 @@ class TestInterruptedSwap:
         monkeypatch.setattr(report_mod.shutil, "rmtree", _cancelling_removal_of(out_dir, command))
         return command.run(), out_dir
 
-    def test_the_report_is_completed(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_the_report_is_completed(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         _, out_dir = self._rebuilt(tmp_path, monkeypatch, name_args)
         assert (out_dir / "data.json").exists()
 
-    def test_the_run_still_succeeds(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_the_run_still_succeeds(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
         assert outcome.code == EXIT_OK
 
-    def test_the_run_still_points_at_boot(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_the_run_still_points_at_boot(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
         assert outcome.next_step is not None
         assert outcome.next_step.command == "boot"
 
     def test_it_says_the_interrupt_came_too_late(
-        self, tmp_path: Path, monkeypatch, name_args, capsys
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         self._rebuilt(tmp_path, monkeypatch, name_args)
         assert "The report was already complete; it was kept." in capsys.readouterr().out
@@ -635,13 +739,21 @@ class TestInterruptedSwap:
 class TestOutcome:
     """The result a completed report reports back to the frame."""
 
-    def test_a_successful_report_succeeds(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_a_successful_report_succeeds(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         assert Report(name_args("my-run"), _TRIMMED).run().code == EXIT_OK
 
     def test_a_successful_report_points_at_boot(
-        self, tmp_path: Path, monkeypatch, name_args
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
     ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -649,7 +761,12 @@ class TestOutcome:
         assert outcome.next_step is not None
         assert outcome.next_step.command == "boot"
 
-    def test_the_next_step_names_the_run(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_the_next_step_names_the_run(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+    ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
         outcome = Report(name_args("my-run"), _TRIMMED).run()
@@ -657,13 +774,17 @@ class TestOutcome:
         assert outcome.next_step.name == "my-run"
 
 
-def _report_building(tmp_path: Path, monkeypatch, name_args) -> Report:
+def _report_building(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name_args: Callable[..., argparse.Namespace]
+) -> Report:
     fs_dir, *_ = _patch(monkeypatch, tmp_path)
     _make_fs_json(fs_dir, "my-run")
     return Report(name_args("my-run"), _TRIMMED)
 
 
-def _report_swapping(tmp_path: Path, monkeypatch, name_args) -> Report:
+def _report_swapping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name_args: Callable[..., argparse.Namespace]
+) -> Report:
     command = _report_building(tmp_path, monkeypatch, name_args)
     command._entering_swap()
     return command
@@ -683,14 +804,14 @@ class TestInterruptResponse:
     @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
     def test_interrupt_response(
         self,
-        make_command,
-        action,
-        expected,
-        notice,
-        tmp_path,
-        monkeypatch,
-        name_args,
-        assert_interrupt_response,
+        make_command: Callable[..., Report],
+        action: str,
+        expected: Response,
+        notice: str | None,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        name_args: Callable[..., argparse.Namespace],
+        assert_interrupt_response: Callable[..., None],
     ) -> None:
         command = make_command(tmp_path, monkeypatch, name_args)
         assert_interrupt_response(command, action, expected, notice)

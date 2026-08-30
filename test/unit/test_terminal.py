@@ -60,31 +60,37 @@ class TestOutputConfig:
 class TestOutputConfigFactory:
     """Derivation of the output configuration from parsed arguments and the stream."""
 
-    def test_trim_follows_the_flag(self, monkeypatch) -> None:
+    def test_trim_follows_the_flag(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=True))
         assert output_config(_args(trim_output=True)).trim is True
 
-    def test_trim_is_off_without_the_flag(self, monkeypatch) -> None:
+    def test_trim_is_off_without_the_flag(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=True))
         assert output_config(_args(trim_output=False)).trim is False
 
-    def test_color_is_on_for_a_terminal_without_the_flag(self, monkeypatch) -> None:
+    def test_color_is_on_for_a_terminal_without_the_flag(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=True))
         assert output_config(_args()).use_color is True
 
-    def test_the_flag_turns_color_off_on_a_terminal(self, monkeypatch) -> None:
+    def test_the_flag_turns_color_off_on_a_terminal(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=True))
         assert output_config(_args(no_color=True)).use_color is False
 
-    def test_color_is_off_when_stdout_is_not_a_terminal(self, monkeypatch) -> None:
+    def test_color_is_off_when_stdout_is_not_a_terminal(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=False))
         assert output_config(_args()).use_color is False
 
-    def test_color_is_off_when_redirected_and_the_flag_is_given(self, monkeypatch) -> None:
+    def test_color_is_off_when_redirected_and_the_flag_is_given(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=False))
         assert output_config(_args(no_color=True)).use_color is False
 
-    def test_trim_is_independent_of_color(self, monkeypatch) -> None:
+    def test_trim_is_independent_of_color(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(sys, "stdout", _Stream(tty=False))
         assert output_config(_args(trim_output=True)).trim is True
 
@@ -217,6 +223,8 @@ class TestVirtualTerminal:
         once = _with_virtual_terminal(0x0001)
         assert _with_virtual_terminal(once) == once
 
-    def test_does_nothing_when_the_windows_api_is_absent(self, monkeypatch) -> None:
+    def test_does_nothing_when_the_windows_api_is_absent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delattr("ctypes.windll", raising=False)
         assert enable_virtual_terminal() is None

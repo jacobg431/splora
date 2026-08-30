@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import re
 import tokenize
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,7 +28,9 @@ def _comments(text: str) -> Iterator[tokenize.TokenInfo]:
             yield token
 
 
-def test_no_comment_switches_off_a_checker(source_files, failure_message) -> None:
+def test_no_comment_switches_off_a_checker(
+    source_files: tuple[tuple[Path, str], ...], failure_message: Callable[..., str]
+) -> None:
     offenders = [
         _Suppression(path=path, lineno=token.start[0], name=token.string)
         for path, text in source_files
