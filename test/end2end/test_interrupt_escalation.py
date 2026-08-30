@@ -27,7 +27,9 @@ class TestInterruptEscalation:
     """What a genuine, OS-delivered SIGINT does to a process running the real escalation stack."""
 
     @pytest.mark.parametrize("cancel, abandon, presses, expected_code", _CASES)
-    def test_escalation(self, mock_command_process, press, cancel, abandon, presses, expected_code) -> None:
+    def test_escalation(
+        self, mock_command_process, press, cancel, abandon, presses, expected_code
+    ) -> None:
         proc = mock_command_process(cancel=cancel, abandon=abandon)
 
         for _ in range(presses):

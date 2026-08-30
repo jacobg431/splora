@@ -12,7 +12,7 @@ import pytest
 import src.boot as boot_mod
 from src.boot import Boot, _finished_reports, _latest_report, _resolve_report_dir
 from src.escalation import Response
-from src.outcome import EXIT_OK
+from src.outcome import EXIT_OK, Outcome
 from src.terminal import OutputConfig
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
@@ -78,14 +78,18 @@ class TestBootCommand:
             Boot(name_args("nonexistent"), _TRIMMED).run()
         assert exc.value.code == 1
 
-    def test_empty_report_dir_exits_with_code_1(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_empty_report_dir_exits_with_code_1(
+        self, tmp_path: Path, monkeypatch, name_args
+    ) -> None:
         _patch(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
             Boot(name_args(), _TRIMMED).run()
         assert exc.value.code == 1
 
-    def test_port_is_found_before_serve_is_called(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_port_is_found_before_serve_is_called(
+        self, tmp_path: Path, monkeypatch, name_args
+    ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
 
@@ -108,7 +112,7 @@ class TestBootCommand:
 class TestStopping:
     """How the command ends once the user interrupts the server it started."""
 
-    def _served(self, tmp_path: Path, monkeypatch, name_args, action: str) -> Response:
+    def _served(self, tmp_path: Path, monkeypatch, name_args, action: str) -> Outcome:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
         command = Boot(name_args("my-run"), _TRIMMED)
@@ -127,7 +131,9 @@ class TestStopping:
     def test_a_cancel_offers_no_next_step(self, tmp_path: Path, monkeypatch, name_args) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").next_step is None
 
-    def test_an_abandon_also_ends_the_run_cleanly(self, tmp_path: Path, monkeypatch, name_args) -> None:
+    def test_an_abandon_also_ends_the_run_cleanly(
+        self, tmp_path: Path, monkeypatch, name_args
+    ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "abandon").code == EXIT_OK
 
 
@@ -266,7 +272,9 @@ class TestStagingDirectoriesAreIgnored:
         _set_mtime(staging, 2_000_000)
         assert _resolve_report_dir(None, report_dir) == finished
 
-    def test_a_staging_directory_alone_leaves_nothing_to_serve(self, tmp_path: Path, monkeypatch) -> None:
+    def test_a_staging_directory_alone_leaves_nothing_to_serve(
+        self, tmp_path: Path, monkeypatch
+    ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / ".run-a.tmp").mkdir()
         with pytest.raises(SystemExit) as exc:
