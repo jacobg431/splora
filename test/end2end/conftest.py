@@ -16,65 +16,19 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 
 from src.boot import _find_free_port, _serve
 from src.explore import _FS_DIR
 from src.report import _REPORT_DIR
+from test.end2end.contracts import AttemptCli, LaunchMock, Pipeline, RunCli, ServeDir, Server
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RUN_NAME = "splora-e2e"
 _PORT_START = 15000
 _READY_LINE = "Ready.\n"
-
-
-@dataclass(frozen=True)
-class Server:
-    """A report server listening in a background thread."""
-
-    port: int
-    url: str
-
-
-@dataclass(frozen=True)
-class Pipeline:
-    """The artifacts one full explore -> report -> boot run produced."""
-
-    scan_root: Path
-    run_name: str
-    json_path: Path
-    report_dir: Path
-    port: int
-    url: str
-    localhost_url: str
-
-
-class ServeDir(Protocol):
-    """Serves a directory in the background, returning once it accepts connections."""
-
-    def __call__(self, report_dir: Path, start_port: int = ...) -> Server: ...
-
-
-class RunCli(Protocol):
-    """Runs the splora CLI as a real subprocess and requires it to exit zero."""
-
-    def __call__(self, *args: str) -> None: ...
-
-
-class AttemptCli(Protocol):
-    """Runs the CLI as a real subprocess and returns its result whatever the exit code."""
-
-    def __call__(self, *args: str) -> subprocess.CompletedProcess[bytes]: ...
-
-
-class LaunchMock(Protocol):
-    """Launches the mock command subprocess and waits for it to report ready."""
-
-    def __call__(self, *, cancel: str = ..., abandon: str = ...) -> subprocess.Popen[str]: ...
 
 
 def _wait_until_listening(port: int, timeout: float = 5.0) -> None:

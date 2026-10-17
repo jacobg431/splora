@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from collections.abc import Callable
 from http.client import HTTPResponse
 from pathlib import Path
 
@@ -19,7 +18,7 @@ import pytest
 
 from src.record import Record
 from src.report import _TEMPLATE_DIR
-from test.end2end.conftest import Pipeline
+from test.end2end.contracts import Pipeline, RunCli
 
 
 def _load_json(path: Path) -> Record:
@@ -120,7 +119,7 @@ class TestReport:
         assert top == template_top | {"data.json"}
 
     def test_regenerating_report_removes_stale_files(
-        self, e2e_pipeline: Pipeline, run_cli: Callable[..., None]
+        self, e2e_pipeline: Pipeline, run_cli: RunCli
     ) -> None:
         report_dir = e2e_pipeline.report_dir
         stale_file = report_dir / "legacy_script.js"

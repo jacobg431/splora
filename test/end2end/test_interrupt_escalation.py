@@ -9,6 +9,8 @@ from collections.abc import Callable
 
 import pytest
 
+from test.end2end.contracts import LaunchMock
+
 _PRESS_GAP = 0.1
 _EXIT_TIMEOUT = 3.0
 
@@ -31,7 +33,7 @@ class TestInterruptEscalation:
     @pytest.mark.parametrize("cancel, abandon, presses, expected_code", _CASES)
     def test_escalation(
         self,
-        mock_command_process: Callable[..., subprocess.Popen[str]],
+        mock_command_process: LaunchMock,
         press: Callable[[subprocess.Popen[str]], None],
         cancel: str,
         abandon: str,
