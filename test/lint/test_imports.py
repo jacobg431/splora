@@ -89,7 +89,9 @@ def _targets(node: ast.Import | ast.ImportFrom, module: str, known: frozenset[st
     return found
 
 
-def _walk_imports(node: ast.AST, inside_function: bool) -> Iterator[tuple[ast.stmt, bool]]:
+def _walk_imports(
+    node: ast.AST, inside_function: bool
+) -> Iterator[tuple[ast.Import | ast.ImportFrom, bool]]:
     """Yield every import statement under a node, flagged when it sits inside a function body."""
     for child in ast.iter_child_nodes(node):
         if isinstance(child, ast.Import | ast.ImportFrom):
@@ -109,8 +111,7 @@ def _names_conftest(node: ast.Import | ast.ImportFrom) -> bool:
 
 def _statement_names_conftest(statement: str) -> bool:
     """Report whether an import statement written as source text reads from a conftest module."""
-    node = ast.parse(statement).body[0]
-    assert isinstance(node, ast.Import | ast.ImportFrom)
+    node, _ = next(_walk_imports(ast.parse(statement), inside_function=False))
     return _names_conftest(node)
 
 
@@ -142,7 +143,6 @@ def imports(
     for path, tree in parsed_files:
         module = _module_name(path)
         for node, is_nested in _walk_imports(tree, inside_function=False):
-            assert isinstance(node, ast.Import | ast.ImportFrom)
             found.append(
                 _Import(
                     path=path,
@@ -186,7 +186,7 @@ def test_no_module_imports_a_conftest(
         _Violation(path=path, lineno=node.lineno, name=ast.unparse(node))
         for path, tree in parsed_files
         for node, _ in _walk_imports(tree, inside_function=False)
-        if isinstance(node, ast.Import | ast.ImportFrom) and _names_conftest(node)
+        if _names_conftest(node)
     ]
     assert not offenders, failure_message(
         "a module imports a conftest; move the shared types into the tier's contracts.py",
