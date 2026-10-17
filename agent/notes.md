@@ -64,6 +64,19 @@ still exercised end-to-end against a mock command). A revival must hold a real s
 some other mechanism — under `PYTHONUNBUFFERED=1` the child flushes its `Exploring :` line
 before the scan begins, which is a usable synchronisation point.
 
+**Never import from a conftest.** pytest loads each `conftest.py` itself as a plugin. Importing
+one as an ordinary module can create a second copy and makes fixture discovery depend on import
+order. An earlier attempt to type fixture parameters with the Protocols their conftest defined
+stalled on exactly this. Each test tier instead keeps the Protocols and value types its fixtures
+hand out in its own `contracts.py`, which both the conftest and the tests import.
+`test/lint/test_imports.py` rejects any conftest import.
+
+**A stand-in for a recursive function also receives its recursion.** `shutil.copytree` calls
+itself through the module-level name for each subdirectory, so a test that patches
+`shutil.copytree` also intercepts those inner calls, with all seven arguments passed
+positionally. Type such a stand-in for every call shape it will actually receive, not only the
+one the code under test makes.
+
 ## Known defects, not yet fixed
 
 **The report swap loses the old report on a crash.** `report` removes the destination
@@ -73,14 +86,6 @@ moved aside. `Report`'s interrupt handling currently carves out an exception for
 landing mid-swap — the run is left to finish and reports success rather than claiming it was
 abandoned — precisely because the same defect would otherwise apply to an interrupt. That
 carve-out can be deleted once the rename-aside fix lands.
-
-**The two `Callable` rules in `test/lint/test_annotations.py` fail on purpose.** The strict-typing
-sweep left about seventy `Callable[..., X]` fixture parameters across the integration and
-end-to-end tests, plus four `Callable[..., Any]` on `serve_dir`. Threading the conftest
-`Protocol`s through to those consumers ran into pytest's fixture-parameter typing and was
-reverted, so the lint tier records the debt as a failing test rather than hiding it behind an
-allowlist. Clear it by giving each fixture parameter the `Protocol` its conftest already
-defines; the tests then pass with no change to the rules.
 
 ## Report folder structure
 

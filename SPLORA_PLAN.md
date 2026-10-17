@@ -15,7 +15,7 @@ This document outlines the features that Splora must have, and the progress towa
 | Terminal UX | ✓ | Run-frame (banner → command body → next-step advice); `--trim-output` and `--no-color` global flags; all-ASCII output; exit codes `0`/`1`/`3`/`130`/`137`; escalating Ctrl+C — cancel when safe, then abandon, then hard-kill |
 | pip entry point | ✓ | `splora` command available after `pip install -e .` |
 | Default excludes | ✓ | `data/config/default_excludes.txt`; overridable with `--no-default-excludes` |
-| Lint tests | ✓ | 19 tests; AST/token checks for the import-layer map, docstring shape, checker-suppression bans, test-tier boundaries, and interrupt-catch safety |
+| Lint tests | ✓ | 33 tests; AST/token checks for the import-layer map, the ban on importing a conftest, docstring shape, annotation shape, checker-suppression bans, test-tier boundaries, and interrupt-catch safety |
 | Unit tests | ✓ | 252 tests; pure, no filesystem or process I/O |
 | Integration tests | ✓ | 148 tests (2 skipped: symlink cases need elevated Windows privileges); filesystem I/O with path constants monkeypatched |
 | End-to-end tests | ✓ | 45 tests (4 skipped on Windows: POSIX-only signal delivery); real subprocesses + background HTTP server; artifacts deleted on teardown |

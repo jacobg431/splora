@@ -128,7 +128,7 @@ Production code sits in layers, and a module may import only from a strictly low
 | commands | `src/explore.py`, `src/report.py`, `src/boot.py` |
 | runtime | `src/frame.py` |
 | components | `src/banner.py`, `src/command.py`, `src/progress.py` |
-| primitives | `src/escalation.py`, `src/outcome.py`, `src/terminal.py` |
+| primitives | `src/escalation.py`, `src/outcome.py`, `src/record.py`, `src/terminal.py` |
 
 The report front end is copied from [`data/template`](data/template).
 
