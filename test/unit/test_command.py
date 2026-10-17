@@ -40,21 +40,24 @@ class _WithoutAbandon(Command):
 class TestContract:
     """What the base class requires of a command before one can exist."""
 
-    def test_the_contract_itself_cannot_be_instantiated(self):
+    def test_the_contract_itself_cannot_be_instantiated(self) -> None:
+        abstract: type = Command
         with pytest.raises(TypeError):
-            Command()
+            abstract()
 
-    def test_a_complete_command_can_be_instantiated(self):
+    def test_a_complete_command_can_be_instantiated(self) -> None:
         assert isinstance(_Complete(), Command)
 
-    def test_a_command_missing_a_member_cannot_be_instantiated(self):
+    def test_a_command_missing_a_member_cannot_be_instantiated(self) -> None:
+        incomplete: type = _WithoutAbandon
         with pytest.raises(TypeError):
-            _WithoutAbandon()
+            incomplete()
 
-    def test_the_refusal_names_the_missing_member(self):
+    def test_the_refusal_names_the_missing_member(self) -> None:
+        incomplete: type = _WithoutAbandon
         with pytest.raises(TypeError) as exc:
-            _WithoutAbandon()
+            incomplete()
         assert "abandon" in str(exc.value)
 
-    def test_a_complete_command_reports_its_outcome(self):
+    def test_a_complete_command_reports_its_outcome(self) -> None:
         assert _Complete().run().code == EXIT_OK

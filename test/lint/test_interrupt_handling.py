@@ -4,6 +4,8 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
+from test.lint.contracts import FailureMessage
+
 _EXEMPT = Path("src") / "escalation.py"
 
 
@@ -35,7 +37,9 @@ def _except_handlers(tree: ast.Module) -> list[ast.ExceptHandler]:
     return [node for node in ast.walk(tree) if isinstance(node, ast.ExceptHandler)]
 
 
-def test_no_broad_interrupt_catch_outside_escalation(parsed_files, failure_message):
+def test_no_broad_interrupt_catch_outside_escalation(
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: FailureMessage
+) -> None:
     offenders = [
         _Violation(path=path, lineno=handler.lineno, name=f"except {ast.unparse(handler.type)}")
         for path, tree in parsed_files

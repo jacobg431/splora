@@ -7,6 +7,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+from test.lint.contracts import FailureMessage
+
 # Matched against comment tokens only, never against raw source text, so that the patterns
 # written here as string literals are not read back as violations of the rule they describe.
 _DIRECTIVE = re.compile(r"#\s*(noqa|type:\s*ignore|ruff:|mypy:|pylint:)", re.IGNORECASE)
@@ -28,7 +30,9 @@ def _comments(text: str) -> Iterator[tokenize.TokenInfo]:
             yield token
 
 
-def test_no_comment_switches_off_a_checker(source_files, failure_message):
+def test_no_comment_switches_off_a_checker(
+    source_files: tuple[tuple[Path, str], ...], failure_message: FailureMessage
+) -> None:
     offenders = [
         _Suppression(path=path, lineno=token.start[0], name=token.string)
         for path, text in source_files

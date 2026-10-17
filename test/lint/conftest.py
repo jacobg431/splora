@@ -1,23 +1,16 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol
 
 import pytest
+
+from test.lint.contracts import FailureMessage, Offender
 
 _REPO_ROOT = Path(__file__).parent.parent.parent
 _SCANNED_DIRS = ("src", "test")
 _SCANNED_MODULES = ("splora.py",)
-
-
-class _Offender(Protocol):
-    """A source location that a lint rule rejected."""
-
-    path: Path
-    lineno: int
-    name: str
 
 
 def _python_files() -> list[Path]:
@@ -49,10 +42,10 @@ def parsed_files(source_files: tuple[tuple[Path, str], ...]) -> tuple[tuple[Path
 
 
 @pytest.fixture(scope="session")
-def failure_message() -> Callable[[str, Sequence[_Offender]], str]:
+def failure_message() -> FailureMessage:
     """Return a helper that renders a lint failure as a problem and the locations breaking it."""
 
-    def render(problem: str, offenders: Sequence[_Offender]) -> str:
+    def render(problem: str, offenders: Sequence[Offender]) -> str:
         lines = [f"{len(offenders)} violation(s) where {problem}:"]
         lines += [f"  {o.path}:{o.lineno} {o.name}" for o in offenders]
         return "\n".join(lines)

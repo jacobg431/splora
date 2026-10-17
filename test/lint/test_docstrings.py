@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from test.lint.contracts import FailureMessage
+
 _SENTENCE_END = re.compile(r"[.!?][\"')\]]*(?:\s|$)")
 
 
@@ -29,8 +31,8 @@ def _visit(
 ) -> Iterator[_Definition]:
     """Yield the definitions declared directly or indirectly under a node."""
     for child in ast.iter_child_nodes(node):
-        is_function = isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
-        if is_function or isinstance(child, ast.ClassDef):
+        if isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
+            is_function = isinstance(child, ast.FunctionDef | ast.AsyncFunctionDef)
             yield _Definition(
                 path=path,
                 lineno=child.lineno,
@@ -59,17 +61,23 @@ def definitions(parsed_files: tuple[tuple[Path, ast.Module], ...]) -> tuple[_Def
     return tuple(found)
 
 
-def test_test_functions_have_no_docstring(definitions, failure_message):
+def test_test_functions_have_no_docstring(
+    definitions: tuple[_Definition, ...], failure_message: FailureMessage
+) -> None:
     offenders = [d for d in definitions if d.is_test_function and d.docstring]
     assert not offenders, failure_message("a test function has a docstring", offenders)
 
 
-def test_classes_have_a_docstring(definitions, failure_message):
+def test_classes_have_a_docstring(
+    definitions: tuple[_Definition, ...], failure_message: FailureMessage
+) -> None:
     offenders = [d for d in definitions if d.is_class and not d.docstring]
     assert not offenders, failure_message("a class is missing a docstring", offenders)
 
 
-def test_public_functions_and_methods_have_a_docstring(definitions, failure_message):
+def test_public_functions_and_methods_have_a_docstring(
+    definitions: tuple[_Definition, ...], failure_message: FailureMessage
+) -> None:
     offenders = [
         d
         for d in definitions
@@ -84,13 +92,17 @@ def test_public_functions_and_methods_have_a_docstring(definitions, failure_mess
     )
 
 
-def test_docstrings_contain_exactly_one_sentence(definitions, failure_message):
+def test_docstrings_contain_exactly_one_sentence(
+    definitions: tuple[_Definition, ...], failure_message: FailureMessage
+) -> None:
     offenders = [d for d in definitions if d.docstring and _sentences(d.docstring) != 1]
     assert not offenders, failure_message(
         "a docstring does not contain exactly one sentence", offenders
     )
 
 
-def test_docstrings_are_a_single_line(definitions, failure_message):
+def test_docstrings_are_a_single_line(
+    definitions: tuple[_Definition, ...], failure_message: FailureMessage
+) -> None:
     offenders = [d for d in definitions if d.docstring and "\n" in d.docstring.strip()]
     assert not offenders, failure_message("a docstring spans more than one line", offenders)

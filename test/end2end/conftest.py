@@ -15,8 +15,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -24,19 +23,12 @@ import pytest
 from src.boot import _find_free_port, _serve
 from src.explore import _FS_DIR
 from src.report import _REPORT_DIR
+from test.end2end.contracts import AttemptCli, LaunchMock, Pipeline, RunCli, ServeDir, Server
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RUN_NAME = "splora-e2e"
 _PORT_START = 15000
 _READY_LINE = "Ready.\n"
-
-
-@dataclass(frozen=True)
-class _Server:
-    """A report server listening in a background thread."""
-
-    port: int
-    url: str
 
 
 def _wait_until_listening(port: int, timeout: float = 5.0) -> None:
@@ -52,10 +44,10 @@ def _wait_until_listening(port: int, timeout: float = 5.0) -> None:
 
 
 @pytest.fixture(scope="session")
-def serve_dir() -> Callable[..., _Server]:
+def serve_dir() -> ServeDir:
     """Return a helper that serves a directory in the background once it accepts connections."""
 
-    def serve(report_dir: Path, start_port: int = _PORT_START) -> _Server:
+    def serve(report_dir: Path, start_port: int = _PORT_START) -> Server:
         port = _find_free_port(start=start_port)
         threading.Thread(
             target=_serve,
@@ -68,7 +60,7 @@ def serve_dir() -> Callable[..., _Server]:
             daemon=True,
         ).start()
         _wait_until_listening(port)
-        return _Server(port=port, url=f"http://127.0.0.1:{port}/")
+        return Server(port=port, url=f"http://127.0.0.1:{port}/")
 
     return serve
 
@@ -85,7 +77,7 @@ def _build_scan_tree(root: Path) -> None:
 
 
 @pytest.fixture(scope="session")
-def run_cli() -> Callable[..., None]:
+def run_cli() -> RunCli:
     """Return a helper that runs the splora CLI as a real subprocess."""
 
     def run(*args: str) -> None:
@@ -100,10 +92,10 @@ def run_cli() -> Callable[..., None]:
 
 
 @pytest.fixture(scope="session")
-def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
+def attempt_cli() -> AttemptCli:
     """Return a helper that runs the CLI and hands back its result whatever the exit code."""
 
-    def attempt(*args: str) -> subprocess.CompletedProcess:
+    def attempt(*args: str) -> subprocess.CompletedProcess[bytes]:
         return subprocess.run(
             [sys.executable, "splora.py", *args],
             cwd=PROJECT_ROOT,
@@ -115,13 +107,14 @@ def attempt_cli() -> Callable[..., subprocess.CompletedProcess]:
 
 def _wait_until_ready(proc: subprocess.Popen[str]) -> None:
     """Block until the mock command process prints its readiness line."""
+    assert proc.stdout is not None
     line = proc.stdout.readline()
     if line != _READY_LINE:
         raise AssertionError(f"mock command process did not print {_READY_LINE!r}; got {line!r}")
 
 
 @pytest.fixture
-def mock_command_process() -> Callable[..., subprocess.Popen[str]]:
+def mock_command_process() -> Iterator[LaunchMock]:
     """Return a helper that launches the mock command and waits for it to report ready."""
     procs: list[subprocess.Popen[str]] = []
 
@@ -164,7 +157,7 @@ def press() -> Callable[[subprocess.Popen[str]], None]:
 
 
 @pytest.fixture
-def scratch_run() -> Callable[[str], str]:
+def scratch_run() -> Iterator[Callable[[str], str]]:
     """Return a helper naming a run whose artifacts are deleted when the test ends."""
     names: list[str] = []
 
@@ -183,7 +176,11 @@ def scratch_run() -> Callable[[str], str]:
 
 
 @pytest.fixture(scope="session")
-def e2e_pipeline(tmp_path_factory, run_cli, serve_dir):
+def e2e_pipeline(
+    tmp_path_factory: pytest.TempPathFactory,
+    run_cli: RunCli,
+    serve_dir: ServeDir,
+) -> Iterator[Pipeline]:
     """Run the full pipeline once and yield the artifacts it produced."""
     scan_root = tmp_path_factory.mktemp("e2e_scan")
     _build_scan_tree(scan_root)
@@ -196,15 +193,15 @@ def e2e_pipeline(tmp_path_factory, run_cli, serve_dir):
 
     json_path = _FS_DIR / f"{RUN_NAME}.json"
 
-    yield {
-        "scan_root": scan_root,
-        "run_name": RUN_NAME,
-        "json_path": json_path,
-        "report_dir": report_dir,
-        "port": server.port,
-        "url": server.url,
-        "localhost_url": f"http://localhost:{server.port}/",
-    }
+    yield Pipeline(
+        scan_root=scan_root,
+        run_name=RUN_NAME,
+        json_path=json_path,
+        report_dir=report_dir,
+        port=server.port,
+        url=server.url,
+        localhost_url=f"http://localhost:{server.port}/",
+    )
 
     if json_path.exists():
         json_path.unlink()

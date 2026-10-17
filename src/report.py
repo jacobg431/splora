@@ -11,6 +11,7 @@ from pathlib import Path
 from src.command import Command
 from src.escalation import Response
 from src.outcome import EXIT_ERROR, EXIT_OK, NextStep, Outcome
+from src.record import Record
 from src.terminal import OutputConfig, notice_line
 
 _REPO_ROOT = Path(__file__).parent.parent
@@ -54,11 +55,11 @@ def _resolve_json_path(name: str | None, fs_dir: Path) -> Path:
     return latest
 
 
-def _read_json(path: Path) -> tuple[str, dict]:
+def _read_json(path: Path) -> tuple[str, Record]:
     """Return a JSON file's raw text alongside its parsed content."""
     try:
         raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
+        data: Record = json.loads(raw)
     except (OSError, json.JSONDecodeError) as exc:
         print(f"Error: cannot read {path}: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -111,7 +112,7 @@ class Report(Command):
         """Generate an HTML report from a recorded exploration run."""
         json_path = _resolve_json_path(self._args.name, _FS_DIR)
         raw, data = _read_json(json_path)
-        meta = data.get("meta", {})
+        meta = data["meta"]
 
         missing = _missing_assets(_TEMPLATE_DIR)
         if missing:
@@ -124,11 +125,11 @@ class Report(Command):
         self._swapping = False
 
         verb = "Updated" if existed else "Generated"
-        print(f"{verb}   : {meta.get('name', json_path.stem)}")
-        if meta.get("partial"):
+        print(f"{verb}   : {meta['name']}")
+        if meta["partial"]:
             print("Warning   : Partial scan -- some files were not visited during explore.")
-        print(f"  Root    : {meta.get('root', '?')}")
-        print(f"  Files   : {meta.get('total_files', '?'):,}")
+        print(f"  Root    : {meta['root']}")
+        print(f"  Files   : {meta['total_files']:,}")
         print(f"  Output  : {out_dir}")
         if self._interrupted_while_swapping:
             print(notice_line("The report was already complete; it was kept.", config=self._config))

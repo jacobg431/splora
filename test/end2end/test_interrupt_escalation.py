@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import time
+from collections.abc import Callable
 
 import pytest
+
+from test.end2end.contracts import LaunchMock
 
 _PRESS_GAP = 0.1
 _EXIT_TIMEOUT = 3.0
@@ -27,7 +31,15 @@ class TestInterruptEscalation:
     """What a genuine, OS-delivered SIGINT does to a process running the real escalation stack."""
 
     @pytest.mark.parametrize("cancel, abandon, presses, expected_code", _CASES)
-    def test_escalation(self, mock_command_process, press, cancel, abandon, presses, expected_code):
+    def test_escalation(
+        self,
+        mock_command_process: LaunchMock,
+        press: Callable[[subprocess.Popen[str]], None],
+        cancel: str,
+        abandon: str,
+        presses: int,
+        expected_code: int | None,
+    ) -> None:
         proc = mock_command_process(cancel=cancel, abandon=abandon)
 
         for _ in range(presses):

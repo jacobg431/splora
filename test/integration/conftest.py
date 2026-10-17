@@ -14,10 +14,12 @@ import pytest
 from src.command import Command
 from src.escalation import Response, escalating
 from src.outcome import EXIT_KILLED
+from src.record import Record
+from test.integration.contracts import AssertInterruptResponse, NameArgs
 
 
 @pytest.fixture(scope="session")
-def name_args() -> Callable[..., argparse.Namespace]:
+def name_args() -> NameArgs:
     """Return a helper that builds the arguments for a command whose only option is --name."""
 
     def build(name: str | None = None) -> argparse.Namespace:
@@ -27,11 +29,12 @@ def name_args() -> Callable[..., argparse.Namespace]:
 
 
 @pytest.fixture(scope="session")
-def load_json() -> Callable[[Path], dict]:
+def load_json() -> Callable[[Path], Record]:
     """Return a helper that parses a JSON file a command wrote."""
 
-    def load(path: Path) -> dict:
-        return json.loads(path.read_text(encoding="utf-8"))
+    def load(path: Path) -> Record:
+        data: Record = json.loads(path.read_text(encoding="utf-8"))
+        return data
 
     return load
 
@@ -57,6 +60,7 @@ def press() -> Callable[[int], None]:
 
     def fire(times: int = 1) -> None:
         handler = signal.getsignal(signal.SIGINT)
+        assert callable(handler)
         for _ in range(times):
             handler(signal.SIGINT, None)
 
@@ -64,7 +68,9 @@ def press() -> Callable[[int], None]:
 
 
 @pytest.fixture
-def assert_interrupt_response(capsys) -> Callable[[Command, str, Response, str | None], None]:
+def assert_interrupt_response(
+    capsys: pytest.CaptureFixture[str],
+) -> AssertInterruptResponse:
     """Return a helper that calls a command's cancel()/abandon() and checks the response."""
 
     def assert_response(

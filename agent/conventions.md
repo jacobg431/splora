@@ -10,13 +10,16 @@ This file is the source of truth, where a rule is also encoded as a check, the c
 - Ask first before creating files outside [`agent/`](.), opening a browser, sending network
   requests, or touching anything outside the repository.
 - Run the tests before reporting a task complete. If they fail and you cannot fix them, say so.
-- A test may not consume the host's resources at scale to make itself work.
+- A test may not consume the host's resources at scale to make itself work. An excluded tier
+  or a temp dir does not license it, and quietly raising a count to buy timing margin is the
+  same fault.
 - Encode a convention as a check wherever one can be written.
 - Change the smallest span that does the job rather than rewriting a whole class or file, and
   never reach for scripted bulk regex over source.
 - Rename code instead of commenting what it does.
 - Write docs that stand alone for a reader who wasn't there when they were written, with no
   rejected alternatives, forward references, or code samples in place of a concept.
+- Keep the agent-facing docs short — a rule buried in noise reads as an absent one.
 - Keep `log.md` entries at summary level and check for a missing trailing newline before
   appending, since one can silently swallow the previous entry.
 
@@ -41,16 +44,17 @@ into an invisible one.
 |---|---|
 | [`conventions.md`](conventions.md) | This file. The rules of the repository. |
 | [`log.md`](log.md) | Append-only activity log. One line per entry. |
-| [`notes.md`](notes.md) | Design decisions, architecture, and implementation status. |
+| [`notes.md`](notes.md) | Binding design decisions, lessons already paid for, and known-but-unfixed defects. |
 | [`skills/`](skills/) | Instructions for recurring workflows. |
 | [`temp/`](temp/) | Git-ignored scratch space. Safe to write freely. |
 
 - **`log.md`** — one line per source-code change, as
   `[YYYY-MM-DD] <intent> | <action taken> | <outcome>`. Facts only, no commentary. Append-only
   and never revised. Failed attempts are logged; documentation-only work is not.
-- **`notes.md`** — what is true *now*, not what happened. Read it at the start of a session to
-  restore context, and replace superseded content rather than appending to it. Session-scoped
-  rationale belongs in `temp/` instead.
+- **`notes.md`** — what an agent would otherwise relearn the hard way. Not a substitute for
+  `README.md` (how the code is laid out) or `SPLORA_PLAN.md` (what is planned). State what is
+  true *now*; replace superseded content rather than appending to it. Session-scoped rationale
+  belongs in `temp/` instead.
 - **`skills/`** — one task-named folder per workflow, each holding a `SKILL.md` whose YAML
   frontmatter (`name`, one-line `description`) precedes instructions for carrying out that task
   here. New skills follow the same layout.
@@ -73,13 +77,18 @@ The language version is **3.13** — no syntax or APIs that need a newer one or 
 - **Modules import downward only.** Each module in [`src/`](../src/) occupies a layer and may
   import only from a strictly lower one. In particular, no module is both a dependency sink and
   a composition root.
+- **Prefer object-oriented design and strongly typed objects.** A nested type annotation is a
+  code smell and should be flagged for refactoring into an appropriate class. Nesting beyond the
+  limit specified in [`test_annotations.py`](../test/lint/test_annotations.py) is illegal, as is
+  a callable type that hides its parameters behind `...` or an `Any` buried inside a larger type.
 
 ## Tests
 
 Prefer the existing conventions — `pytest`, `tmp_path`, `monkeypatch` — over new frameworks or
-helpers. A test belongs to the narrowest tier that can express it. The lint tier parses source
-text and runs no behavior, so it sits outside the filesystem-I/O distinction below. Unit tests
-stay pure — no filesystem or process I/O. A test that touches the filesystem is an integration
-test, unless it drives a real running process or server, which puts it in the end-to-end tier
-instead. The end-to-end tier can take longer to complete compared to other tiers, due to running
-real processes, so it is excluded from the default run and invoked explicitly.
+helpers. Never import from a `conftest.py`. Types that a conftest shares with its tests live in
+that tier's `contracts.py`. A test belongs to the narrowest tier that can express it. The lint
+tier parses source text and runs no behavior, so it sits outside the filesystem-I/O distinction
+below. Unit tests stay pure — no filesystem or process I/O. A test that touches the filesystem
+is an integration test, unless it drives a real running process or server, which puts it in the
+end-to-end tier instead. The end-to-end tier can take longer to complete compared to other tiers,
+due to running real processes, so it is excluded from the default run and invoked explicitly.

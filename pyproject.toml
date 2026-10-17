@@ -13,6 +13,7 @@ authors = [
     { name = "Claude Sonnet 4.6" },
     { name = "Claude Sonnet 5" },
     { name = "Claude Opus 4.8" },
+    { name = "Claude Opus 5.5" },
 ]
 dependencies = []
 
