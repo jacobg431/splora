@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 import time
 from collections.abc import Callable
@@ -17,6 +16,7 @@ from src.boot import Boot, _finished_reports, _latest_report, _resolve_report_di
 from src.escalation import Response
 from src.outcome import EXIT_OK, Outcome
 from src.terminal import OutputConfig
+from test.integration.contracts import AssertInterruptResponse, NameArgs
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
 
@@ -40,7 +40,7 @@ class TestBootCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
@@ -55,7 +55,7 @@ class TestBootCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "first").mkdir()
@@ -72,7 +72,7 @@ class TestBootCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "C_drive").mkdir()
@@ -87,7 +87,7 @@ class TestBootCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         _patch(monkeypatch, tmp_path)
 
@@ -99,7 +99,7 @@ class TestBootCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         _patch(monkeypatch, tmp_path)
 
@@ -111,7 +111,7 @@ class TestBootCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         report_dir = _patch(monkeypatch, tmp_path)
         (report_dir / "my-run").mkdir()
@@ -139,7 +139,7 @@ class TestStopping:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         action: str,
     ) -> Outcome:
         report_dir = _patch(monkeypatch, tmp_path)
@@ -160,7 +160,7 @@ class TestStopping:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").code == EXIT_OK
 
@@ -168,7 +168,7 @@ class TestStopping:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "cancel").next_step is None
 
@@ -176,12 +176,12 @@ class TestStopping:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         assert self._served(tmp_path, monkeypatch, name_args, "abandon").code == EXIT_OK
 
 
-def _boot_serving(name_args: Callable[..., argparse.Namespace]) -> Boot:
+def _boot_serving(name_args: NameArgs) -> Boot:
     return Boot(name_args("my-run"), _TRIMMED)
 
 
@@ -197,12 +197,12 @@ class TestInterruptResponse:
     @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
     def test_interrupt_response(
         self,
-        make_command: Callable[..., Boot],
+        make_command: Callable[[NameArgs], Boot],
         action: str,
         expected: Response,
         notice: str | None,
-        name_args: Callable[..., argparse.Namespace],
-        assert_interrupt_response: Callable[..., None],
+        name_args: NameArgs,
+        assert_interrupt_response: AssertInterruptResponse,
     ) -> None:
         command = make_command(name_args)
         assert_interrupt_response(command, action, expected, notice)

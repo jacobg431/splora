@@ -9,7 +9,7 @@ import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 import pytest
 
@@ -21,6 +21,7 @@ from src.outcome import EXIT_OK, EXIT_PARTIAL, Outcome
 from src.progress import Progress
 from src.record import Record, ScanNode
 from src.terminal import OutputConfig
+from test.integration.contracts import AssertInterruptResponse
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
 _DECORATED = OutputConfig(trim=False, use_color=False)
@@ -40,13 +41,34 @@ def _make_scan_tree(parent: Path) -> Path:
     return scan
 
 
-def _scan_calling(*responses: Callable[[], object]) -> Callable[..., ScanNode]:
+class _ScanDir(Protocol):
+    """Scans one directory into a node, called as explore calls _scan_dir."""
+
+    def __call__(
+        self,
+        path: Path,
+        depth: int,
+        depth_limit: int,
+        excludes: set[str],
+        state: _State,
+        progress: Progress,
+    ) -> ScanNode: ...
+
+
+def _scan_calling(*responses: Callable[[], object]) -> _ScanDir:
     """Return a _scan_dir stand-in that invokes the given responses before it scans."""
 
-    def scan(*args: Any, **kwargs: Any) -> ScanNode:
+    def scan(
+        path: Path,
+        depth: int,
+        depth_limit: int,
+        excludes: set[str],
+        state: _State,
+        progress: Progress,
+    ) -> ScanNode:
         for respond in responses:
             respond()
-        return _REAL_SCAN_DIR(*args, **kwargs)
+        return _REAL_SCAN_DIR(path, depth, depth_limit, excludes, state, progress)
 
     return scan
 
@@ -64,7 +86,7 @@ def _advancing_clock(step: float = 1.0) -> Callable[[], float]:
     return monotonic
 
 
-def _replace_calling(respond: Callable[[], object]) -> Callable[..., None]:
+def _replace_calling(respond: Callable[[], object]) -> Callable[[object, object], None]:
     """Return a Path.replace stand-in that invokes a response instead of renaming."""
 
     def replace(_self: object, _target: object) -> None:
@@ -817,13 +839,13 @@ class TestInterruptResponse:
     @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
     def test_interrupt_response(
         self,
-        make_command: Callable[..., Explore],
+        make_command: Callable[[Path, pytest.MonkeyPatch], Explore],
         action: str,
         expected: Response,
         notice: str | None,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        assert_interrupt_response: Callable[..., None],
+        assert_interrupt_response: AssertInterruptResponse,
     ) -> None:
         command = make_command(tmp_path, monkeypatch)
         assert_interrupt_response(command, action, expected, notice)

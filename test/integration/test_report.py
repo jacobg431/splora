@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import argparse
 import json
+import os
 import shutil
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Any
+from typing import Protocol
 
 import pytest
 
@@ -28,6 +28,7 @@ from src.report import (
     _staging_dir,
 )
 from src.terminal import OutputConfig
+from test.integration.contracts import AssertInterruptResponse, NameArgs
 
 _TRIMMED = OutputConfig(trim=True, use_color=False)
 _DECORATED = OutputConfig(trim=False, use_color=False)
@@ -38,40 +39,48 @@ _REAL_COPYTREE = shutil.copytree
 _REAL_RMTREE = shutil.rmtree
 
 
-def _cancelling(press: Callable[[int], None]) -> Callable[..., None]:
+class _CopyTree(Protocol):
+    """Copies a tree, called both by report and by copytree recursing into each subdirectory."""
+
+    def __call__(
+        self, src: str | os.PathLike[str], dst: str | os.PathLike[str], /, *recursion: object
+    ) -> None: ...
+
+
+def _cancelling(press: Callable[[int], None]) -> _CopyTree:
     """Return a copytree stand-in that stages the tree in full and then presses once."""
 
-    def stage(src: str | Path, dst: str | Path, *_args: Any, **_kwargs: Any) -> None:
+    def stage(src: str | os.PathLike[str], dst: str | os.PathLike[str], *_: object) -> None:
         _REAL_COPYTREE(src, dst)
         press(1)
 
     return stage
 
 
-def _cancelling_removal_of(target: Path, command: Report) -> Callable[..., None]:
+def _cancelling_removal_of(target: Path, command: Report) -> Callable[[Path], None]:
     """Return an rmtree stand-in that cancels the command as the target is being removed."""
 
-    def remove(path: str | Path, *args: Any, **kwargs: Any) -> None:
-        if Path(path) == target:
+    def remove(path: Path) -> None:
+        if path == target:
             command.cancel()
-        return _REAL_RMTREE(path, *args, **kwargs)
+        _REAL_RMTREE(path)
 
     return remove
 
 
-def _raising(error: BaseException) -> Callable[..., None]:
+def _raising(error: BaseException) -> _CopyTree:
     """Return a copytree stand-in that fails before anything is staged."""
 
-    def fail(*_args: Any, **_kwargs: Any) -> None:
+    def fail(_src: str | os.PathLike[str], _dst: str | os.PathLike[str], *_: object) -> None:
         raise error
 
     return fail
 
 
-def _staged_then_raising(error: BaseException) -> Callable[..., None]:
+def _staged_then_raising(error: BaseException) -> _CopyTree:
     """Return a copytree stand-in that stages the tree in full and then fails."""
 
-    def fail(src: str | Path, dst: str | Path, *_args: Any, **_kwargs: Any) -> None:
+    def fail(src: str | os.PathLike[str], dst: str | os.PathLike[str], *_: object) -> None:
         _REAL_COPYTREE(src, dst)
         raise error
 
@@ -144,7 +153,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -161,7 +170,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         src_path = _make_fs_json(fs_dir, "my-run")
@@ -175,7 +184,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "first")
@@ -191,7 +200,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         _patch(monkeypatch, tmp_path)
 
@@ -203,7 +212,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         _patch(monkeypatch, tmp_path)
 
@@ -215,7 +224,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, _, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -229,7 +238,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         load_json: Callable[[Path], Record],
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
@@ -252,7 +261,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "partial-run", partial=True)
@@ -265,7 +274,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "C_drive")  # stored with sanitized name
@@ -278,7 +287,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "clean-run")
@@ -292,7 +301,7 @@ class TestReportCommand:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, report_dir, template_dir = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -602,7 +611,7 @@ class TestCancel:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         escalating_run: Callable[[Command], AbstractContextManager[None]],
         press: Callable[[int], None],
         config: OutputConfig = _TRIMMED,
@@ -620,7 +629,7 @@ class TestCancel:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         escalating_run: Callable[[Command], AbstractContextManager[None]],
         press: Callable[[int], None],
     ) -> None:
@@ -631,7 +640,7 @@ class TestCancel:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         escalating_run: Callable[[Command], AbstractContextManager[None]],
         press: Callable[[int], None],
     ) -> None:
@@ -642,7 +651,7 @@ class TestCancel:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         escalating_run: Callable[[Command], AbstractContextManager[None]],
         press: Callable[[int], None],
         capsys: pytest.CaptureFixture[str],
@@ -654,7 +663,7 @@ class TestCancel:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         escalating_run: Callable[[Command], AbstractContextManager[None]],
         press: Callable[[int], None],
         capsys: pytest.CaptureFixture[str],
@@ -666,7 +675,7 @@ class TestCancel:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         escalating_run: Callable[[Command], AbstractContextManager[None]],
         press: Callable[[int], None],
         capsys: pytest.CaptureFixture[str],
@@ -682,7 +691,7 @@ class TestInterruptedSwap:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> tuple[Outcome, Path]:
         fs_dir, report_dir, _ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -697,7 +706,7 @@ class TestInterruptedSwap:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         _, out_dir = self._rebuilt(tmp_path, monkeypatch, name_args)
         assert (out_dir / "data.json").exists()
@@ -706,7 +715,7 @@ class TestInterruptedSwap:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
         assert outcome.code == EXIT_OK
@@ -715,7 +724,7 @@ class TestInterruptedSwap:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         outcome, _ = self._rebuilt(tmp_path, monkeypatch, name_args)
         assert outcome.next_step is not None
@@ -725,7 +734,7 @@ class TestInterruptedSwap:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         self._rebuilt(tmp_path, monkeypatch, name_args)
@@ -739,7 +748,7 @@ class TestOutcome:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -749,7 +758,7 @@ class TestOutcome:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -761,7 +770,7 @@ class TestOutcome:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
+        name_args: NameArgs,
     ) -> None:
         fs_dir, *_ = _patch(monkeypatch, tmp_path)
         _make_fs_json(fs_dir, "my-run")
@@ -771,7 +780,7 @@ class TestOutcome:
 
 
 def _report_building(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name_args: Callable[..., argparse.Namespace]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name_args: NameArgs
 ) -> Report:
     fs_dir, *_ = _patch(monkeypatch, tmp_path)
     _make_fs_json(fs_dir, "my-run")
@@ -779,7 +788,7 @@ def _report_building(
 
 
 def _report_swapping(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name_args: Callable[..., argparse.Namespace]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name_args: NameArgs
 ) -> Report:
     command = _report_building(tmp_path, monkeypatch, name_args)
     command._entering_swap()
@@ -800,14 +809,14 @@ class TestInterruptResponse:
     @pytest.mark.parametrize("make_command, action, expected, notice", _CASES)
     def test_interrupt_response(
         self,
-        make_command: Callable[..., Report],
+        make_command: Callable[[Path, pytest.MonkeyPatch, NameArgs], Report],
         action: str,
         expected: Response,
         notice: str | None,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
-        name_args: Callable[..., argparse.Namespace],
-        assert_interrupt_response: Callable[..., None],
+        name_args: NameArgs,
+        assert_interrupt_response: AssertInterruptResponse,
     ) -> None:
         command = make_command(tmp_path, monkeypatch, name_args)
         assert_interrupt_response(command, action, expected, notice)

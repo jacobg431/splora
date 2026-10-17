@@ -8,7 +8,6 @@ import signal
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Protocol
 
 import pytest
 
@@ -16,15 +15,7 @@ from src.command import Command
 from src.escalation import Response, escalating
 from src.outcome import EXIT_KILLED
 from src.record import Record
-
-
-class NameArgs(Protocol):
-    """Builds the argument namespace for a command whose only option is --name."""
-
-    def __call__(self, name: str | None = None) -> argparse.Namespace: ...
-
-
-AssertInterruptResponse = Callable[[Command, str, Response, str | None], None]
+from test.integration.contracts import AssertInterruptResponse, NameArgs
 
 
 @pytest.fixture(scope="session")
