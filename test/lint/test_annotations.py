@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from test.lint.conftest import FailureMessage
+from test.lint.contracts import FailureMessage
 
 # Raise or lower this one number to retune how much annotation nesting the tier allows.
 _MAX_SHAPE_SCORE = 3
@@ -119,7 +119,7 @@ def _score_of(annotation: str) -> int:
 def test_the_shape_score_stays_calibrated_against_annotations_that_must_pass() -> None:
     assert _score_of("tuple[tuple[Path, ast.Module], ...]") == 2
     assert _score_of("Callable[[Command], AbstractContextManager[None]]") == 2
-    assert _score_of("Callable[[str, Sequence[_Offender]], str]") == 2
+    assert _score_of("Callable[[str, Sequence[Offender]], str]") == 2
     assert _MAX_SHAPE_SCORE == 3
 
 

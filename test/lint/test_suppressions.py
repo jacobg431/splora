@@ -7,7 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from test.lint.conftest import FailureMessage
+from test.lint.contracts import FailureMessage
 
 # Matched against comment tokens only, never against raw source text, so that the patterns
 # written here as string literals are not read back as violations of the rule they describe.

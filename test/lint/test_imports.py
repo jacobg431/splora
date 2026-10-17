@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from test.lint.conftest import FailureMessage
+from test.lint.contracts import FailureMessage
 
 
 @dataclass(frozen=True)
@@ -98,6 +98,22 @@ def _walk_imports(node: ast.AST, inside_function: bool) -> Iterator[tuple[ast.st
         yield from _walk_imports(child, inside_function or is_function)
 
 
+def _names_conftest(node: ast.Import | ast.ImportFrom) -> bool:
+    """Report whether an import statement reads from a conftest module, which only pytest loads."""
+    if isinstance(node, ast.Import):
+        return any(alias.name.split(".")[-1] == "conftest" for alias in node.names)
+    if node.module and node.module.split(".")[-1] == "conftest":
+        return True
+    return any(alias.name == "conftest" for alias in node.names)
+
+
+def _statement_names_conftest(statement: str) -> bool:
+    """Report whether an import statement written as source text reads from a conftest module."""
+    node = ast.parse(statement).body[0]
+    assert isinstance(node, ast.Import | ast.ImportFrom)
+    return _names_conftest(node)
+
+
 def _layer_index(module: str) -> int | None:
     """Return the position of the layer a module is declared in, or None when it has none."""
     for index, layer in enumerate(_LAYERS):
@@ -145,6 +161,37 @@ def test_imports_are_declared_at_module_level(
 ) -> None:
     offenders = [record for record in imports if record.is_nested]
     assert not offenders, failure_message("an import is declared inside a function", offenders)
+
+
+@pytest.mark.parametrize(
+    ("statement", "expected"),
+    [
+        ("from test.lint.conftest import FailureMessage", True),
+        ("from .conftest import FailureMessage", True),
+        ("from test.lint import conftest", True),
+        ("from . import conftest", True),
+        ("import test.lint.conftest", True),
+        ("from test.lint.contracts import FailureMessage", False),
+        ("import conftest_helpers", False),
+    ],
+)
+def test_the_conftest_check_recognises_every_import_form(statement: str, expected: bool) -> None:
+    assert _statement_names_conftest(statement) is expected
+
+
+def test_no_module_imports_a_conftest(
+    parsed_files: tuple[tuple[Path, ast.Module], ...], failure_message: FailureMessage
+) -> None:
+    offenders = [
+        _Violation(path=path, lineno=node.lineno, name=ast.unparse(node))
+        for path, tree in parsed_files
+        for node, _ in _walk_imports(tree, inside_function=False)
+        if isinstance(node, ast.Import | ast.ImportFrom) and _names_conftest(node)
+    ]
+    assert not offenders, failure_message(
+        "a module imports a conftest; move the shared types into the tier's contracts.py",
+        offenders,
+    )
 
 
 def test_every_module_declares_a_layer(production_modules: frozenset[str]) -> None:

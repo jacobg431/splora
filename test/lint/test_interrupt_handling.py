@@ -4,7 +4,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-from test.lint.conftest import FailureMessage
+from test.lint.contracts import FailureMessage
 
 _EXEMPT = Path("src") / "escalation.py"
 

@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from test.lint.conftest import FailureMessage
+from test.lint.contracts import FailureMessage
 
 _UNIT_TIER = ("test", "unit")
 _DISALLOWED_FIXTURES = ("tmp_path", "tmp_path_factory")

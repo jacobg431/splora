@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from test.lint.conftest import FailureMessage
+from test.lint.contracts import FailureMessage
 
 _SENTENCE_END = re.compile(r"[.!?][\"')\]]*(?:\s|$)")
 
